@@ -155,7 +155,9 @@ input:focus-visible{outline:4px solid var(--accent);outline-offset:2px}
 "use strict";
 const HOST="https://overpass-api.de";
 const $=id=>document.getElementById(id);
-const ZASIEG=100;      // metry pokazywane i czytane
+const ZASIEG=100;      // metry pokazywane na ekranie
+const ZASIEG_MOWA=20;  // metry zapowiadane głosem — tylko to, co pod nogami
+const DOBRY_FIX=15;    // dokładność GPS, poniżej której ufamy pozycji
 const CACHE_R=150;     // metry pobierane z serwera za jednym razem
 const ODSWIEZ_PO=50;   // po tylu metrach marszu dociągamy nowe dane
 
@@ -435,7 +437,41 @@ async function adresDlaPunktu(mow){
   }catch(e){}
   return null;
 }
-function ustawPozycje(lat,lon,acc){ pt={lat:+lat,lon:+lon,acc}; $("skanuj").disabled=false; }
+/* Pojedynczy odczyt GPS potrafi skoczyć o kilkadziesiąt metrów. Nasłuchujemy
+   bez przerwy i odrzucamy odczyty wyraźnie gorsze od świeżego, dobrego. */
+let watchStaly=null;
+function przyjmijFix(p){
+  const a=p.coords.accuracy;
+  const swiezy = pt && Date.now()-pt.czas < 10000;
+  if(swiezy && a > pt.acc*2 && a > DOBRY_FIX) return false;
+  pt={lat:p.coords.latitude, lon:p.coords.longitude, acc:a, czas:Date.now()};
+  $("skanuj").disabled=false;
+  if(typeof p.coords.heading==="number"&&!isNaN(p.coords.heading)&&p.coords.speed>0.6){
+    heading=p.coords.heading; pokazKompas();
+  }
+  return true;
+}
+function startWatch(){
+  if(watchStaly!=null||!navigator.geolocation) return;
+  watchStaly=navigator.geolocation.watchPosition(przyjmijFix,()=>{},
+    {enableHighAccuracy:true, maximumAge:0, timeout:30000});
+}
+/* Czeka na porządny odczyt, ale nie w nieskończoność. */
+function czekajNaFix(ms){
+  return new Promise(res=>{
+    const koniec=Date.now()+ms;
+    (function sprawdz(){
+      if(pt&&pt.acc<=DOBRY_FIX) return res(true);
+      if(Date.now()>koniec) return res(!!pt);
+      setTimeout(sprawdz,500);
+    })();
+  });
+}
+function ostrzezOdokladnosci(){
+  if(pt&&pt.acc>ZASIEG_MOWA)
+    powiedz("Uwaga, dokładność pozycji "+metry(Math.round(pt.acc))+
+            ", czyli gorsza niż promień zapowiedzi. Wyniki mogą być przesunięte.");
+}
 
 $("start").onclick=async()=>{
   $("start").remove();
@@ -446,17 +482,14 @@ $("start").onclick=async()=>{
     "Dodaj go w ustawieniach, w zamianie tekstu na mowę.");
   wlaczKompas();
   if(!navigator.geolocation) return powiedz("To urządzenie nie udostępnia lokalizacji.");
-  navigator.geolocation.getCurrentPosition(
-    async p=>{
-      ustawPozycje(p.coords.latitude,p.coords.longitude,p.coords.accuracy);
-      pokazGdzie("Pozycja ustalona", p.coords.accuracy);
-      const a=await adresDlaPunktu(true);
-      powiedz("Dokładność "+metry(Math.round(p.coords.accuracy))+
-        (a?".":". Adresu nie udało się ustalić.")+" Naciśnij duży przycisk, aby zeskanować otoczenie.");
-    },
-    e=>powiedz("Nie udało się ustalić pozycji. "+e.message),
-    {enableHighAccuracy:true,timeout:20000,maximumAge:10000}
-  );
+  startWatch();
+  const mam=await czekajNaFix(15000);
+  if(!mam) return powiedz("Nie udało się ustalić pozycji. Wyjdź spod dachu i spróbuj ponownie.");
+  pokazGdzie("Pozycja ustalona", pt.acc);
+  const a=await adresDlaPunktu(true);
+  powiedz("Dokładność "+metry(Math.round(pt.acc))+
+    (a?".":". Adresu nie udało się ustalić.")+" Naciśnij duży przycisk, aby zeskanować otoczenie.");
+  ostrzezOdokladnosci();
 };
 
 /* ============ KOMPAS ============ */
@@ -716,21 +749,33 @@ $("powtorz").onclick=()=>{
   powiedz(opisSkanu(ostatniSkan,SEKCJE.map(s=>s.id),true),{przerwij:true});
 };
 
+const zdanie=it=>(it.nazwaMowa?it.nazwaMowa+", "+it.opis:it.opis)+
+  ", "+metry(it.d)+", "+kierunekMowa(it.az)+".";
+
+/* Głosem tylko to, co bliżej niż ZASIEG_MOWA. Przy przejściach i przeszkodach,
+   gdy w tym promieniu nic nie ma, podaję jedno najbliższe dalej — cisza
+   byłaby myląca, bo brzmi jak „nic tam nie ma”. */
 function opisSkanu(grupy,ktore,zNaglowkiem){
   const wybrane=SEKCJE.filter(s=>ktore.includes(s.id));
-  let ile=0; wybrane.forEach(s=>ile+=grupy[s.id].length);
-  if(!ile) return zNaglowkiem
-    ? "W promieniu "+metry(ZASIEG)+" mapa nie zna przejść ani przeszkód. "+
-      "To nie znaczy, że ich nie ma."
-    : "Adresów ani sklepów w tym promieniu mapa nie zna.";
   const cz=[];
-  if(zNaglowkiem) cz.push("W promieniu "+metry(ZASIEG)+": "+obiekty(ile)+".");
+  let ile=0;
+  for(const s of wybrane) ile+=grupy[s.id].filter(it=>it.d<=ZASIEG_MOWA).length;
+
+  if(zNaglowkiem) cz.push(ile
+    ? "W promieniu "+metry(ZASIEG_MOWA)+": "+obiekty(ile)+"."
+    : "W promieniu "+metry(ZASIEG_MOWA)+" nic nie znaleziono.");
+
   for(const s of wybrane){
-    const l=grupy[s.id]; if(!l.length) continue;
-    cz.push(s.label+": "+obiekty(l.length)+".");
-    l.slice(0,4).forEach(it=>
-      cz.push((it.nazwaMowa?it.nazwaMowa+", "+it.opis:it.opis)+", "+metry(it.d)+", "+kierunekMowa(it.az)+"."));
+    const blisko=grupy[s.id].filter(it=>it.d<=ZASIEG_MOWA);
+    if(blisko.length){
+      cz.push(s.label+": "+obiekty(blisko.length)+".");
+      blisko.slice(0,5).forEach(it=>cz.push(zdanie(it)));
+    }else if(PILNE.includes(s.id)&&grupy[s.id].length){
+      cz.push("Dalej, poza "+metry(ZASIEG_MOWA)+": "+zdanie(grupy[s.id][0]));
+    }
   }
+  if(cz.length===(zNaglowkiem?1:0))
+    return zNaglowkiem ? cz[0]+" To nie znaczy, że wokół nic nie ma." : "";
   if(zNaglowkiem&&heading==null) cz.push("Kompas nieaktywny, kierunki podaję jako strony świata.");
   return cz.join(" ");
 }
@@ -742,10 +787,11 @@ $("marsz").onclick=()=>{
   zapowiedziane=new Set();
   $("marsz").textContent="Zakończ marsz";
   powiedz("Tryb marszu włączony. Ostrzegam o przejściach i przeszkodach bliżej niż "+
-    metry(ZASIEG)+".",{przerwij:true});
+    metry(ZASIEG_MOWA)+".",{przerwij:true});
+  ostrzezOdokladnosci();
   watchId=navigator.geolocation.watchPosition(wKroku,
     e=>powiedz("Utracono pozycję. "+e.message),
-    {enableHighAccuracy:true,maximumAge:3000,timeout:20000});
+    {enableHighAccuracy:true,maximumAge:0,timeout:20000});
 };
 function zatrzymajMarsz(){
   if(watchId!=null) navigator.geolocation.clearWatch(watchId);
@@ -753,11 +799,8 @@ function zatrzymajMarsz(){
   powiedz("Tryb marszu wyłączony.",{przerwij:true});
 }
 async function wKroku(p){
-  ustawPozycje(p.coords.latitude,p.coords.longitude,p.coords.accuracy);
-  if(typeof p.coords.heading==="number"&&!isNaN(p.coords.heading)&&p.coords.speed>0.6){
-    heading=p.coords.heading; pokazKompas();
-  }
-  pokazGdzie("W ruchu", p.coords.accuracy);
+  if(!przyjmijFix(p)) return;
+  pokazGdzie("W ruchu", pt.acc);
   if(cel) zapowiedzCel();
   let els;
   if(maszLokalne()) els=okolica.rek;
@@ -767,11 +810,11 @@ async function wKroku(p){
   const teraz=Date.now();
   if(teraz-ostatniaZapowiedz<6000) return;
   for(const kat of PILNE){
-    const it=grupy[kat].find(x=>!x.cichy&&!zapowiedziane.has(x.id));
+    const it=grupy[kat].find(x=>!x.cichy&&x.d<=ZASIEG_MOWA&&!zapowiedziane.has(x.id));
     if(!it) continue;
     zapowiedziane.add(it.id);
     ostatniaZapowiedz=teraz;
-    wibruj(it.d<25?[120,60,120]:80);
+    wibruj(it.d<10?[150,70,150,70,150]:[120,60,120]);
     powiedz((it.nazwaMowa?it.nazwaMowa+", ":"")+it.opis+", "+metry(it.d)+", "+kierunekMowa(it.az)+".");
     return;
   }
