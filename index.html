@@ -40,14 +40,11 @@ body{background:var(--bg);color:var(--fg);font:18px/1.5 var(--font);
 h1{font-size:26px;font-weight:800;margin:0;letter-spacing:-.02em}
 h2{font-size:19px;font-weight:700;margin:0}
 .tag{font-size:15px;color:var(--muted);margin:4px 0 0}
-
-/* ekran startowy — jedno dotknięcie odblokowuje mowę i uprawnienia */
 #start{position:fixed;inset:0;z-index:50;background:var(--accent);color:var(--accent-fg);
   border:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:18px;padding:32px;font:inherit;text-align:center;cursor:pointer}
 #start .duze{font-size:34px;font-weight:800;line-height:1.2}
 #start .male{font-size:17px;max-width:30ch;opacity:.92}
-
 button{font:inherit;font-weight:700;border-radius:14px;cursor:pointer;
   border:2px solid var(--accent);background:var(--accent);color:var(--accent-fg);
   padding:18px 16px;min-height:60px;width:100%}
@@ -56,8 +53,7 @@ button:disabled{opacity:.45;cursor:default}
 button:focus-visible{outline:4px solid var(--fg);outline-offset:3px}
 .glowny{font-size:23px;min-height:96px}
 .para{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.para button{width:100%}
-.card{background:transparent;border:2px solid var(--line);border-radius:16px;padding:16px}
+.card{border:2px solid var(--line);border-radius:16px;padding:16px}
 .gdzie{font-size:19px;font-weight:700;margin:0}
 .coords{display:block;font-family:var(--mono);font-size:13px;color:var(--muted);
   font-weight:400;margin-top:4px;font-variant-numeric:tabular-nums}
@@ -65,7 +61,6 @@ button:focus-visible{outline:4px solid var(--fg);outline-offset:3px}
 .tempo{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:16px}
 .tempo button{width:64px;min-height:52px;padding:0;font-size:24px}
 .tempo span{flex:1 1 auto;text-align:center}
-
 .status{font-size:17px;font-weight:700;padding:14px;border-radius:12px;
   background:var(--good-soft);color:var(--good);display:none;white-space:pre-line}
 .status.err{background:var(--alarm-soft);color:var(--alarm)}
@@ -114,6 +109,7 @@ input:focus-visible{outline:4px solid var(--accent);outline-offset:2px}
   <div class="card">
     <p class="gdzie" id="gdzie">Nie ustalono pozycji.</p>
     <p class="kompas" id="kompasTxt">Kompas wyłączony.</p>
+    <p class="kompas" id="glosTxt">Sprawdzam dostępne głosy…</p>
     <div class="tempo">
       <button class="ghost" id="wolniej" type="button" aria-label="Mów wolniej">−</button>
       <span id="tempoTxt">Tempo mowy 1,0</span>
@@ -121,7 +117,7 @@ input:focus-visible{outline:4px solid var(--accent);outline-offset:2px}
     </div>
   </div>
 
-  <button class="glowny" id="skanuj" type="button">Skanuj otoczenie</button>
+  <button class="glowny" id="skanuj" type="button" disabled>Skanuj otoczenie</button>
 
   <div class="para">
     <button class="ghost" id="marsz" type="button">Tryb marszu</button>
@@ -153,8 +149,8 @@ input:focus-visible{outline:4px solid var(--accent);outline-offset:2px}
 const HOST="https://overpass-api.de";
 const $=id=>document.getElementById(id);
 const ZASIEG=100;      // metry pokazywane i czytane
-const CACHE_R=300;     // metry pobierane z serwera za jednym razem
-const ODSWIEZ_PO=120;  // po tylu metrach marszu dociągamy nowe dane
+const CACHE_R=150;     // metry pobierane z serwera za jednym razem
+const ODSWIEZ_PO=50;   // po tylu metrach marszu dociągamy nowe dane
 
 let pt=null, heading=null, tempo=1.0;
 let cache=null, ostatniSkan=null, cel=null;
@@ -162,19 +158,49 @@ let watchId=null, zapowiedziane=new Set(), ostatniaZapowiedz=0, ostatniPobor=0;
 
 try{ const t=parseFloat(localStorage.getItem("otoczenie:tempo")); if(t>0.5&&t<3) tempo=t; }catch(e){}
 
-/* ================= MOWA ================= */
+/* ============ POLSZCZYZNA ============
+   Liczebniki odmieniają się inaczej niż w angielskim: 1 metr, 2 metry,
+   5 metrów, ale 12 metrów i 22 metry. Bez tego mowa brzmi jak tłumaczenie. */
+function odm(n,jed,kilka,wiele){
+  const d=n%10, s=n%100;
+  if(n===1) return jed;
+  if(d>=2&&d<=4&&!(s>=12&&s<=14)) return kilka;
+  return wiele;
+}
+const metry   = n=>n+" "+odm(n,"metr","metry","metrów");
+const obiekty = n=>n+" "+odm(n,"obiekt","obiekty","obiektów");
+const stopnie = n=>n+" "+odm(n,"stopień","stopnie","stopni");
+/* Godziny czyta się w miejscowniku: „na godzinie drugiej”, nie „dwa”. */
+const GODZINY=["","pierwszej","drugiej","trzeciej","czwartej","piątej","szóstej",
+               "siódmej","ósmej","dziewiątej","dziesiątej","jedenastej","dwunastej"];
+
+/* ============ MOWA ============ */
 const Synteza=window.speechSynthesis;
-const kolejka=[]; let mowi=false;
+const kolejka=[]; let mowi=false; let glos=null, brakPolskiego=false;
+
+/* Sam atrybut lang="pl-PL" nie wystarcza: bez zainstalowanego polskiego
+   głosu silnik czyta polski tekst angielską fonetyką. */
+function wybierzGlos(){
+  const v=(Synteza&&Synteza.getVoices&&Synteza.getVoices())||[];
+  if(!v.length) return;
+  glos=v.find(x=>/^pl([-_]|$)/i.test(x.lang))||null;
+  brakPolskiego=!glos;
+  $("glosTxt").textContent = glos
+    ? "Głos: "+glos.name
+    : "Brak polskiego głosu w telefonie — mowa będzie zniekształcona.";
+  $("glosTxt").style.color = glos ? "var(--muted)" : "var(--alarm)";
+}
+if(Synteza){ Synteza.onvoiceschanged=wybierzGlos; wybierzGlos(); }
 function powiedz(txt,{przerwij=false}={}){
   if(!Synteza) return;
   if(przerwij){ Synteza.cancel(); kolejka.length=0; mowi=false; }
-  kolejka.push(txt);
-  nastepne();
+  kolejka.push(txt); nastepne();
 }
 function nastepne(){
   if(mowi||!kolejka.length||!Synteza) return;
   const u=new SpeechSynthesisUtterance(kolejka.shift());
   u.lang="pl-PL"; u.rate=tempo;
+  if(glos) u.voice=glos;
   mowi=true;
   u.onend=u.onerror=()=>{ mowi=false; nastepne(); };
   Synteza.speak(u);
@@ -183,13 +209,12 @@ function pokazTempo(){
   $("tempoTxt").textContent="Tempo mowy "+tempo.toFixed(1).replace(".",",");
   try{ localStorage.setItem("otoczenie:tempo",String(tempo)); }catch(e){}
 }
-$("wolniej").onclick=()=>{ tempo=Math.max(0.6,+(tempo-0.1).toFixed(1)); pokazTempo(); powiedz("Tempo "+tempo.toFixed(1).replace(".",","),{przerwij:true}); };
-$("szybciej").onclick=()=>{ tempo=Math.min(2.5,+(tempo+0.1).toFixed(1)); pokazTempo(); powiedz("Tempo "+tempo.toFixed(1).replace(".",","),{przerwij:true}); };
+$("wolniej").onclick=()=>{ tempo=Math.max(0.6,+(tempo-0.1).toFixed(1)); pokazTempo(); powiedz("Mowa wolniejsza.",{przerwij:true}); };
+$("szybciej").onclick=()=>{ tempo=Math.min(2.5,+(tempo+0.1).toFixed(1)); pokazTempo(); powiedz("Mowa szybsza.",{przerwij:true}); };
 pokazTempo();
+function wibruj(w){ try{ navigator.vibrate&&navigator.vibrate(w); }catch(e){} }
 
-function wibruj(ms){ try{ navigator.vibrate&&navigator.vibrate(ms); }catch(e){} }
-
-/* ================= GEOMETRIA ================= */
+/* ============ GEOMETRIA ============ */
 function dist(a,b,c,d){
   const R=6371000,p=Math.PI/180;
   const dla=(c-a)*p,dlo=(d-b)*p;
@@ -205,17 +230,17 @@ function azymut(a,b,c,d){
 const STRONY=["północ","północny wschód","wschód","południowy wschód",
               "południe","południowy zachód","zachód","północny zachód"];
 const strona=az=>STRONY[Math.round(az/45)%8];
-/* Tarcza zegara liczona względem kierunku patrzenia. */
 function godzina(az){
   if(heading==null) return null;
   const d=((az-heading)%360+360)%360;
   const g=Math.round(d/30);
   return g===0?12:g;
 }
-function kierunekSlownie(az){
-  const g=godzina(az);
-  return g!=null ? "na godzinie "+g : "na "+strona(az);
-}
+const kierunekMowa = az=>{ const g=godzina(az);
+  return g!=null ? "na godzinie "+GODZINY[g] : "na "+strona(az); };
+const kierunekEkran = az=>{ const g=godzina(az);
+  return g!=null ? "godz. "+g : strona(az); };
+
 function najblizszy(el,skad){
   const pts=[];
   if(Array.isArray(el.geometry)) pts.push(...el.geometry);
@@ -233,45 +258,63 @@ function najblizszy(el,skad){
   return best;
 }
 
-/* ================= CO JEST WAŻNE DLA PIESZEGO ================= */
+/* ============ CO JEST WAŻNE DLA PIESZEGO ============ */
 const PRZEJSCIA="przejscia", PRZESZKODY="przeszkody", WEJSCIA="wejscia",
       TRANSPORT="transport", USLUGI="uslugi", ULICE="ulice";
 
+/* Obiekty bez wartości orientacyjnej — pomijane całkowicie. */
+const POMIN=new Set(["waste_basket","vending_machine","recycling","waste_disposal",
+                     "smoking_area","bbq","fountain","clock"]);
+
+/* cichy:true — pokazuję na ekranie, ale nie zapowiadam w marszu.
+   Latarni i ławek są dziesiątki, zagłuszyłyby to, co naprawdę ważne. */
 const WPISY=[
   [t=>t.highway==="crossing"||t.footway==="crossing", PRZEJSCIA, t=>{
-    const s=[];
-    if(t.crossing==="traffic_signals"||t["crossing:signals"]==="yes") s.push("z sygnalizacją");
-    if(t["traffic_signals:sound"]==="yes"||t["traffic_signals:vibration"]==="yes") s.push("dźwiękowa");
-    if(t.tactile_paving==="yes") s.push("z pasami ostrzegawczymi");
-    if(t.tactile_paving==="no") s.push("bez pasów ostrzegawczych");
-    return "przejście dla pieszych"+(s.length?", "+s.join(", "):"");
+    let s="przejście dla pieszych";
+    const sygn=t.crossing==="traffic_signals"||t["crossing:signals"]==="yes";
+    const dzw=t["traffic_signals:sound"]==="yes";
+    if(sygn&&dzw) s+=" z sygnalizacją dźwiękową";
+    else if(sygn) s+=" z sygnalizacją świetlną";
+    else s+=" bez sygnalizacji";
+    if(t.tactile_paving==="yes") s+=", z pasami ostrzegawczymi";
+    else if(t.tactile_paving==="no") s+=", bez pasów ostrzegawczych";
+    return s;
   }],
   [t=>t.highway==="traffic_signals", PRZEJSCIA, t=>
     "sygnalizacja świetlna"+(t["traffic_signals:sound"]==="yes"?" z sygnałem dźwiękowym":"")],
 
-  [t=>t.highway==="steps", PRZESZKODY, t=>
-    "schody"+(t.step_count?", "+t.step_count+" stopni":"")+(t.handrail==="yes"?", z poręczą":"")],
-  [t=>t.barrier==="kerb"||t.kerb, PRZESZKODY, t=>
-    "krawężnik"+(t.kerb==="lowered"?" obniżony":t.kerb==="raised"?" wysoki":"")],
-  [t=>t.barrier==="bollard", PRZESZKODY, ()=>"słupek"],
+  [t=>t.highway==="steps", PRZESZKODY, t=>{
+    let s="schody";
+    if(t.step_count) s+=", "+stopnie(+t.step_count);
+    if(t.handrail==="yes") s+=", z poręczą";
+    if(t.tactile_paving==="yes") s+=", z pasami ostrzegawczymi";
+    return s;
+  }],
+  [t=>t.barrier==="kerb"||!!t.kerb, PRZESZKODY, t=>
+    "krawężnik"+(t.kerb==="lowered"?" obniżony":t.kerb==="raised"?" wysoki":
+                 t.kerb==="flush"?" zrównany z jezdnią":"")],
+  [t=>t.barrier==="bollard", PRZESZKODY, ()=>"słupek", true],
   [t=>t.barrier==="gate"||t.barrier==="lift_gate", PRZESZKODY, ()=>"brama"],
-  [t=>!!t.barrier, PRZESZKODY, ()=>"przeszkoda, ogrodzenie"],
+  [t=>t.barrier==="cycle_barrier", PRZESZKODY, ()=>"barierka"],
+  [t=>!!t.barrier, PRZESZKODY, ()=>"ogrodzenie", true],
   [t=>t.highway==="construction"||t.building==="construction", PRZESZKODY, ()=>"roboty, budowa"],
-  [t=>t.man_made==="street_lamp"||t.highway==="street_lamp", PRZESZKODY, ()=>"latarnia"],
-  [t=>t.amenity==="bicycle_parking"||t.amenity==="motorcycle_parking", PRZESZKODY, ()=>"stojaki"],
+  [t=>t.highway==="street_lamp"||t.man_made==="street_lamp", PRZESZKODY, ()=>"latarnia", true],
+  [t=>t.amenity==="bench", PRZESZKODY, ()=>"ławka", true],
+  [t=>t.amenity==="bicycle_parking"||t.amenity==="motorcycle_parking", PRZESZKODY, ()=>"stojaki rowerowe", true],
 
   [t=>!!t.entrance, WEJSCIA, t=>{
     const s=[];
+    s.push(t.entrance==="main"?"wejście główne":"wejście");
     if(t.wheelchair==="yes") s.push("dostępne dla wózków");
     if(t.automatic_door==="yes") s.push("drzwi automatyczne");
-    if(t.entrance==="main") s.push("wejście główne");
-    return (s.length?s.join(", "):"wejście");
+    return s.join(", ");
   }],
 
   [t=>t.highway==="bus_stop"||t.public_transport==="platform", TRANSPORT, t=>
     "przystanek"+(t.tactile_paving==="yes"?" z pasami ostrzegawczymi":"")],
   [t=>t.railway==="tram_stop", TRANSPORT, ()=>"przystanek tramwajowy"],
   [t=>/^(station|halt)$/.test(t.railway||""), TRANSPORT, ()=>"stacja kolejowa"],
+  [t=>t.railway==="level_crossing"||t.railway==="crossing", PRZEJSCIA, ()=>"przejazd kolejowy"],
 
   [t=>t.shop==="supermarket", USLUGI, ()=>"supermarket"],
   [t=>!!t.shop, USLUGI, ()=>"sklep"],
@@ -279,14 +322,15 @@ const WPISY=[
   [t=>/^(doctors|clinic|dentist|hospital)$/.test(t.amenity||""), USLUGI, ()=>"placówka zdrowia"],
   [t=>/^(restaurant|cafe|bar|fast_food|pub)$/.test(t.amenity||""), USLUGI, ()=>"lokal gastronomiczny"],
   [t=>/^(bank|atm|post_office)$/.test(t.amenity||""), USLUGI, ()=>"bank lub poczta"],
+  [t=>t.amenity==="toilets", USLUGI, ()=>"toaleta"],
   [t=>!!t.office, USLUGI, ()=>"biuro"],
-  [t=>!!t.amenity, USLUGI, ()=>"obiekt usługowy"],
+  [t=>!!t.amenity, USLUGI, ()=>"obiekt usługowy", true],
   [t=>!!t["addr:housenumber"], WEJSCIA, ()=>"adres"],
 
-  [t=>t.highway==="footway"||t.highway==="path", ULICE, t=>
-    "chodnik"+(t.tactile_paving==="yes"?" z pasami ostrzegawczymi":"")],
+  [t=>t.highway==="footway"||t.highway==="path"||t.highway==="pedestrian", ULICE, t=>
+    "chodnik"+(t.tactile_paving==="yes"?" z pasami ostrzegawczymi":""), true],
   [t=>/^(motorway|trunk|primary|secondary)$/.test(t.highway||""), ULICE, ()=>"ulica o dużym ruchu"],
-  [t=>!!t.highway, ULICE, ()=>"ulica"],
+  [t=>!!t.highway, ULICE, ()=>"ulica", true],
   [t=>!!t.railway, ULICE, ()=>"tory"]
 ];
 
@@ -298,10 +342,12 @@ const SEKCJE=[
   {id:USLUGI,     label:"Sklepy i usługi"},
   {id:ULICE,      label:"Ulice i chodniki"}
 ];
-const PILNE=new Set([PRZEJSCIA,PRZESZKODY]);
+const PILNE=[PRZEJSCIA,PRZESZKODY];
 
 function rozpoznaj(t){
-  for(const [gdy,kat,opis] of WPISY) if(gdy(t)) return {kat, opis:opis(t)};
+  if(t.amenity&&POMIN.has(t.amenity)) return null;
+  for(const [gdy,kat,opis,cichy] of WPISY)
+    if(gdy(t)) return {kat, opis:opis(t), cichy:!!cichy};
   return null;
 }
 function etykieta(t){
@@ -311,10 +357,10 @@ function etykieta(t){
   return t.operator||t.brand||null;
 }
 
-/* ================= POZYCJA ================= */
-function pokazGdzie(txt,dokladnosc){
+/* ============ POZYCJA ============ */
+function pokazGdzie(txt,acc){
   $("gdzie").innerHTML=esc(txt)+
-    (dokladnosc?' <span style="font-weight:400;color:var(--muted)">(±'+Math.round(dokladnosc)+" m)</span>":"")+
+    (acc?' <span style="font-weight:400;color:var(--muted)">(±'+Math.round(acc)+" m)</span>":"")+
     (pt?'<span class="coords">'+pt.lat.toFixed(5)+", "+pt.lon.toFixed(5)+"</span>":"");
 }
 async function adresDlaPunktu(mow){
@@ -334,35 +380,34 @@ async function adresDlaPunktu(mow){
   }catch(e){}
   return null;
 }
-
-function ustawPozycje(lat,lon,acc){
-  pt={lat:+lat, lon:+lon, acc};
-  $("skanuj").disabled=false;
-}
+function ustawPozycje(lat,lon,acc){ pt={lat:+lat,lon:+lon,acc}; $("skanuj").disabled=false; }
 
 $("start").onclick=async()=>{
   $("start").remove();
+  wybierzGlos();
   powiedz("Otoczenie, wersja testowa. To pomoc w orientacji, nie zamiennik laski ani psa przewodnika. "+
           "Dane z mapy bywają niekompletne. Ustalam pozycję.");
+  if(brakPolskiego) powiedz("Uwaga: w tym telefonie nie ma polskiego głosu. "+
+    "Dodaj go w ustawieniach, w zamianie tekstu na mowę.");
   wlaczKompas();
-  if(!navigator.geolocation){ powiedz("To urządzenie nie udostępnia lokalizacji."); return; }
+  if(!navigator.geolocation) return powiedz("To urządzenie nie udostępnia lokalizacji.");
   navigator.geolocation.getCurrentPosition(
     async p=>{
       ustawPozycje(p.coords.latitude,p.coords.longitude,p.coords.accuracy);
       pokazGdzie("Pozycja ustalona", p.coords.accuracy);
       const a=await adresDlaPunktu(true);
-      if(!a) powiedz("Pozycja ustalona z dokładnością "+Math.round(p.coords.accuracy)+" metrów.");
-      powiedz("Naciśnij duży przycisk, aby zeskanować otoczenie.");
+      powiedz("Dokładność "+metry(Math.round(p.coords.accuracy))+
+        (a?".":". Adresu nie udało się ustalić.")+" Naciśnij duży przycisk, aby zeskanować otoczenie.");
     },
     e=>powiedz("Nie udało się ustalić pozycji. "+e.message),
     {enableHighAccuracy:true,timeout:20000,maximumAge:10000}
   );
 };
 
-/* ================= KOMPAS ================= */
+/* ============ KOMPAS ============ */
 function pokazKompas(){
   $("kompasTxt").textContent = heading==null
-    ? "Kompas wyłączony — kierunki podawane jako strony świata."
+    ? "Kompas wyłączony — kierunki jako strony świata."
     : "Patrzysz na "+strona(heading)+" ("+Math.round(heading)+"°).";
 }
 async function wlaczKompas(){
@@ -383,15 +428,17 @@ async function wlaczKompas(){
   pokazKompas();
 }
 
-/* ================= DANE ================= */
+/* ============ DANE ============
+   Dwa zbiory: linie z pełną geometrią (do nich liczy się najbliższy punkt),
+   reszta tylko ze środkiem. Pełna geometria budynków to megabajty bez pożytku. */
 function buildQL(lat,lon,r){
   const a="(around:"+r+","+lat+","+lon+")";
-  const klucze=["highway","footway","crossing","barrier","kerb","entrance",
-    '"addr:housenumber"',"amenity","shop","office","public_transport","railway",
-    "building","man_made","tactile_paving"];
-  return "[out:json][timeout:25];(\n"+
-    klucze.map(k=>"  nwr"+a+"["+k+"];").join("\n")+
-    "\n);\nout tags geom 1200;";
+  return "[out:json][timeout:25];"+
+    "(way"+a+"[highway];way"+a+"[barrier];way"+a+"[railway];)->.l;"+
+    "(node"+a+"[highway];node"+a+"[barrier];node"+a+"[kerb];node"+a+"[entrance];"+
+    "nwr"+a+'["addr:housenumber"];nwr'+a+"[amenity];nwr"+a+"[shop];nwr"+a+"[office];"+
+    "node"+a+"[public_transport];node"+a+"[railway];)->.p;"+
+    ".l out geom 500;.p out center 1500;";
 }
 async function askOverpass(ql){
   const fails=[];
@@ -411,11 +458,10 @@ async function askOverpass(ql){
   }
   const err=new Error("serwer nie odpowiedział"); err.fails=fails; throw err;
 }
-async function dajDane(force){
-  const teraz=Date.now();
-  if(!force&&cache&&dist(cache.lat,cache.lon,pt.lat,pt.lon)<ODSWIEZ_PO) return cache.elements;
-  if(!force&&teraz-ostatniPobor<30000&&cache) return cache.elements;
-  ostatniPobor=teraz;
+async function dajDane(){
+  if(cache&&dist(cache.lat,cache.lon,pt.lat,pt.lon)<ODSWIEZ_PO) return cache.elements;
+  if(cache&&Date.now()-ostatniPobor<30000) return cache.elements;
+  ostatniPobor=Date.now();
   const d=await askOverpass(buildQL(pt.lat,pt.lon,CACHE_R));
   cache={lat:pt.lat, lon:pt.lon, elements:d.elements||[]};
   return cache.elements;
@@ -432,25 +478,22 @@ function zbierz(els,skad,zasieg){
                      :hit.kat+"|"+hit.opis+"|"+np.la.toFixed(5)+","+np.lo.toFixed(5);
     const prev=kosze[hit.kat].get(klucz);
     if(!prev||np.d<prev.d)
-      kosze[hit.kat].set(klucz,{id:klucz, nazwa, opis:hit.opis, d:np.d, la:np.la, lo:np.lo,
-        az:azymut(skad.lat,skad.lon,np.la,np.lo)});
+      kosze[hit.kat].set(klucz,{id:klucz, nazwa, opis:hit.opis, cichy:hit.cichy,
+        d:np.d, la:np.la, lo:np.lo, az:azymut(skad.lat,skad.lon,np.la,np.lo)});
   }
   const grupy={};
   SEKCJE.forEach(s=>grupy[s.id]=[...kosze[s.id].values()].sort((a,b)=>a.d-b.d));
   return grupy;
 }
 
-/* ================= SKAN ================= */
+/* ============ SKAN ============ */
 $("skanuj").onclick=async()=>{
   if(!pt) return powiedz("Najpierw muszę ustalić pozycję.",{przerwij:true});
   $("skanuj").disabled=true;
   powiedz("Skanuję otoczenie.",{przerwij:true});
   try{
-    const els=await dajDane(false);
-    const grupy=zbierz(els,pt,ZASIEG);
-    ostatniSkan=grupy;
-    rysuj(grupy);
-    powiedz(opisSkanu(grupy));
+    const grupy=zbierz(await dajDane(),pt,ZASIEG);
+    ostatniSkan=grupy; rysuj(grupy); powiedz(opisSkanu(grupy));
   }catch(e){
     const m="Nie udało się pobrać danych. "+(e.fails?e.fails.join(". "):e.message);
     setStatus(m,"err"); powiedz(m);
@@ -460,37 +503,35 @@ $("powtorz").onclick=()=>{
   if(!ostatniSkan) return powiedz("Nie ma czego powtórzyć. Najpierw zeskanuj otoczenie.",{przerwij:true});
   powiedz(opisSkanu(ostatniSkan),{przerwij:true});
 };
-
 function opisSkanu(grupy){
-  const cz=[];
   let ile=0; SEKCJE.forEach(s=>ile+=grupy[s.id].length);
-  if(!ile) return "W promieniu "+ZASIEG+" metrów mapa nic nie zna. To nie znaczy, że wokół nic nie ma.";
-  cz.push("W promieniu "+ZASIEG+" metrów: "+ile+" obiektów.");
+  if(!ile) return "W promieniu "+metry(ZASIEG)+" mapa nic nie zna. To nie znaczy, że wokół nic nie ma.";
+  const cz=["W promieniu "+metry(ZASIEG)+": "+obiekty(ile)+"."];
   for(const s of SEKCJE){
     const l=grupy[s.id]; if(!l.length) continue;
-    cz.push(s.label+", "+l.length+".");
+    cz.push(s.label+": "+obiekty(l.length)+".");
     l.slice(0,4).forEach(it=>
-      cz.push((it.nazwa?it.nazwa+", "+it.opis:it.opis)+", "+it.d+" metrów, "+kierunekSlownie(it.az)+"."));
+      cz.push((it.nazwa?it.nazwa+", "+it.opis:it.opis)+", "+metry(it.d)+", "+kierunekMowa(it.az)+"."));
   }
   if(heading==null) cz.push("Kompas nieaktywny, kierunki podaję jako strony świata.");
   return cz.join(" ");
 }
 
-/* ================= TRYB MARSZU ================= */
+/* ============ TRYB MARSZU ============ */
 $("marsz").onclick=()=>{
-  if(watchId!=null){ zatrzymajMarsz(); return; }
+  if(watchId!=null) return zatrzymajMarsz();
   if(!navigator.geolocation) return powiedz("Brak dostępu do lokalizacji.");
   zapowiedziane=new Set();
   $("marsz").textContent="Zakończ marsz";
-  powiedz("Tryb marszu włączony. Ostrzegam o przejściach i przeszkodach bliżej niż "+ZASIEG+" metrów.",{przerwij:true});
+  powiedz("Tryb marszu włączony. Ostrzegam o przejściach i przeszkodach bliżej niż "+
+    metry(ZASIEG)+".",{przerwij:true});
   watchId=navigator.geolocation.watchPosition(wKroku,
     e=>powiedz("Utracono pozycję. "+e.message),
     {enableHighAccuracy:true,maximumAge:3000,timeout:20000});
 };
 function zatrzymajMarsz(){
   if(watchId!=null) navigator.geolocation.clearWatch(watchId);
-  watchId=null;
-  $("marsz").textContent="Tryb marszu";
+  watchId=null; $("marsz").textContent="Tryb marszu";
   powiedz("Tryb marszu wyłączony.",{przerwij:true});
 }
 async function wKroku(p){
@@ -500,29 +541,25 @@ async function wKroku(p){
   }
   pokazGdzie("W ruchu", p.coords.accuracy);
   if(cel) zapowiedzCel();
-  let els;
-  try{ els=await dajDane(false); }catch(e){ return; }
+  let els; try{ els=await dajDane(); }catch(e){ return; }
   const grupy=zbierz(els,pt,ZASIEG);
   ostatniSkan=grupy; rysuj(grupy);
-
   const teraz=Date.now();
   if(teraz-ostatniaZapowiedz<6000) return;
   for(const kat of PILNE){
-    const kand=grupy[kat].filter(it=>it.d<=ZASIEG&&!zapowiedziane.has(it.id));
-    if(!kand.length) continue;
-    const it=kand[0];
+    const it=grupy[kat].find(x=>!x.cichy&&!zapowiedziane.has(x.id));
+    if(!it) continue;
     zapowiedziane.add(it.id);
     ostatniaZapowiedz=teraz;
     wibruj(it.d<25?[120,60,120]:80);
-    powiedz((it.nazwa?it.nazwa+", ":"")+it.opis+", "+it.d+" metrów, "+kierunekSlownie(it.az)+".");
+    powiedz((it.nazwa?it.nazwa+", ":"")+it.opis+", "+metry(it.d)+", "+kierunekMowa(it.az)+".");
     return;
   }
 }
 
-/* ================= PROWADZENIE DO CELU ================= */
+/* ============ PROWADZENIE ============ */
 function ustawCel(it){
   cel={la:it.la, lo:it.lo, nazwa:it.nazwa||it.opis};
-  $("celTxt").textContent="Cel: "+cel.nazwa;
   $("celStop").hidden=false;
   powiedz("Cel ustawiony: "+cel.nazwa+".",{przerwij:true});
   zapowiedzCel();
@@ -533,23 +570,23 @@ $("celStop").onclick=()=>{
 };
 function zapowiedzCel(){
   if(!cel||!pt) return;
-  const d=dist(pt.lat,pt.lon,cel.la,cel.lo);
-  const az=azymut(pt.lat,pt.lon,cel.la,cel.lo);
-  $("celTxt").textContent="Cel: "+cel.nazwa+" — "+d+" m, "+kierunekSlownie(az);
-  if(d<=8){ powiedz("Jesteś przy celu: "+cel.nazwa+".",{przerwij:true}); wibruj([200,80,200]); cel=null;
-    $("celStop").hidden=true; return; }
+  const d=dist(pt.lat,pt.lon,cel.la,cel.lo), az=azymut(pt.lat,pt.lon,cel.la,cel.lo);
+  $("celTxt").textContent="Cel: "+cel.nazwa+" — "+d+" m, "+kierunekEkran(az);
+  if(d<=8){
+    powiedz("Jesteś przy celu: "+cel.nazwa+".",{przerwij:true});
+    wibruj([200,80,200]); cel=null; $("celStop").hidden=true; return;
+  }
   const teraz=Date.now();
   if(teraz-ostatniaZapowiedz<5000) return;
   ostatniaZapowiedz=teraz;
-  powiedz("Cel "+d+" metrów, "+kierunekSlownie(az)+".");
+  powiedz("Do celu "+metry(d)+", "+kierunekMowa(az)+".");
 }
 
-/* ================= ADRES ================= */
+/* ============ ADRES ============ */
 async function findAddr(){
   const q=$("addr").value.trim();
   if(q.length<3) return powiedz("Wpisz co najmniej trzy znaki.");
-  powiedz("Szukam adresu.");
-  $("sugg").innerHTML="";
+  powiedz("Szukam adresu."); $("sugg").innerHTML="";
   try{
     const r=await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5"+
       "&countrycodes=pl&q="+encodeURIComponent(q));
@@ -560,10 +597,7 @@ async function findAddr(){
       const li=document.createElement("li");
       const b=document.createElement("button");
       b.type="button"; b.textContent=x.display_name;
-      b.onclick=()=>{
-        ustawCel({la:+x.lat, lo:+x.lon, nazwa:x.display_name.split(",")[0]});
-        $("sugg").innerHTML="";
-      };
+      b.onclick=()=>{ ustawCel({la:+x.lat, lo:+x.lon, nazwa:x.display_name.split(",")[0]}); $("sugg").innerHTML=""; };
       li.appendChild(b); $("sugg").appendChild(li);
     });
   }catch(e){ powiedz("Wyszukiwarka adresów nie odpowiada."); }
@@ -583,7 +617,7 @@ $("mic").onclick=()=>{
   r.start();
 };
 
-/* ================= WIDOK ================= */
+/* ============ WIDOK ============ */
 function setStatus(msg,kind){
   const s=$("status");
   if(!msg){ s.style.display="none"; return; }
@@ -605,7 +639,7 @@ function rysuj(grupy){
       nm.innerHTML="<span>"+esc(it.nazwa||it.opis)+"</span>"+
         (it.nazwa?'<span class="kind">'+esc(it.opis)+"</span>":"");
       const dd=document.createElement("span"); dd.className="dist";
-      dd.innerHTML=it.d+" m<small>"+esc(kierunekSlownie(it.az))+"</small>";
+      dd.innerHTML=it.d+" m<small>"+esc(kierunekEkran(it.az))+"</small>";
       const b=document.createElement("button");
       b.type="button"; b.className="ghost"; b.textContent="Prowadź";
       b.onclick=()=>ustawCel(it);
@@ -619,12 +653,11 @@ function rysuj(grupy){
     box.appendChild(sec);
   }
   box.style.display=total?"flex":"none";
-  setStatus(total?("Znaleziono "+total+" obiektów w promieniu "+ZASIEG+" m."):
-    ("W promieniu "+ZASIEG+" m mapa nic nie zna."), total?null:"err");
+  setStatus(total?("Znaleziono "+obiekty(total)+" w promieniu "+metry(ZASIEG)+"."):
+    ("W promieniu "+metry(ZASIEG)+" mapa nic nie zna."), total?null:"err");
 }
 function esc(s){ return String(s).replace(/[<>&"]/g,
   c=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c])); }
-$("skanuj").disabled=true;
 </script>
 </body>
 </html>
