@@ -138,8 +138,9 @@ input:focus-visible{outline:4px solid var(--accent);outline-offset:2px}
   </div>
 
   <div class="card">
-    <h2>Szukaj adresu</h2>
-    <input id="addr" type="search" placeholder="miejscowość i ulica" autocomplete="off" enterkeyhint="search">
+    <h2>Szukaj w okolicy</h2>
+    <p class="tag" id="szukajTxt">Ulica, numer albo nazwa sklepu. Szukam w pobranym obszarze.</p>
+    <input id="addr" type="search" placeholder="np. Zielona 12, apteka" autocomplete="off" enterkeyhint="search">
     <ul class="sugg" id="sugg"></ul>
     <div class="para" style="margin-top:10px">
       <button class="ghost" id="find" type="button">Szukaj</button>
@@ -446,9 +447,8 @@ function przyjmijFix(p){
   if(swiezy && a > pt.acc*2 && a > DOBRY_FIX) return false;
   pt={lat:p.coords.latitude, lon:p.coords.longitude, acc:a, czas:Date.now()};
   $("skanuj").disabled=false;
-  if(typeof p.coords.heading==="number"&&!isNaN(p.coords.heading)&&p.coords.speed>0.6){
-    heading=p.coords.heading; pokazKompas();
-  }
+  if(typeof p.coords.heading==="number"&&!isNaN(p.coords.heading)&&p.coords.speed>0.6)
+    ustawKursGps(p.coords.heading);
   return true;
 }
 function startWatch(){
@@ -493,19 +493,63 @@ $("start").onclick=async()=>{
 };
 
 /* ============ KOMPAS ============ */
-function pokazKompas(){
-  $("kompasTxt").textContent = heading==null
-    ? "Kompas wyłączony — kierunki jako strony świata."
-    : "Patrzysz na "+strona(heading)+" ("+Math.round(heading)+"°).";
+/* ===== KIERUNEK PATRZENIA =====
+   Dwa źródła. Kurs z GPS jest wiarygodny, ale istnieje tylko w ruchu.
+   Magnetometr działa w bezruchu, lecz przy metalu myli się o 20-30 stopni.
+   Bierzemy GPS, kiedy jest świeży; magnetometr uśredniamy i mierzymy jego
+   rozrzut, żeby wiedzieć, czy w ogóle ma sens. */
+let zrodloKursu=null, kursGpsCzas=0, kompasPewnosc=1, kompasAcc=null;
+const bufor=[];           // ostatnie odczyty magnetometru
+const GPS_WAZNY=8000;     // ms, przez które kurs z GPS pozostaje aktualny
+
+function dodajOdczyt(h){
+  const r=h*Math.PI/180;
+  bufor.push([Math.cos(r),Math.sin(r)]);
+  if(bufor.length>12) bufor.shift();
+  const c=bufor.reduce((a,b)=>a+b[0],0)/bufor.length;
+  const s=bufor.reduce((a,b)=>a+b[1],0)/bufor.length;
+  kompasPewnosc=Math.sqrt(c*c+s*s);     // 1 = odczyty zgodne, 0 = chaos
+  return (Math.atan2(s,c)*180/Math.PI+360)%360;
 }
+function ustawKursGps(h){
+  heading=h; zrodloKursu="gps"; kursGpsCzas=Date.now(); pokazKompas();
+}
+function gpsAktualny(){ return zrodloKursu==="gps"&&Date.now()-kursGpsCzas<GPS_WAZNY; }
+
+/* Szerszy wycinek, gdy kierunek jest niepewny — lepiej ostrzec o czymś
+   zbędnym niż przemilczeć przeszkodę przez błąd kompasu. */
+function sektor(){
+  if(gpsAktualny()) return 50;
+  if(kompasAcc!=null&&kompasAcc>25) return 90;
+  if(kompasPewnosc<0.85) return 90;
+  return 70;
+}
+function pokazKompas(){
+  if(heading==null) return $("kompasTxt").textContent=
+    "Kierunek nieznany — podaję strony świata.";
+  const zr=gpsAktualny()?"z GPS, dokładny":
+    (kompasAcc!=null&&kompasAcc>25)||kompasPewnosc<0.85?"z kompasu, niepewny":"z kompasu";
+  $("kompasTxt").textContent="Patrzysz na "+strona(heading)+" ("+Math.round(heading)+"°) — "+
+    zr+". Wycinek ±"+sektor()+"°.";
+}
+let ostrzezonoOKompasie=false;
 async function wlaczKompas(){
   const D=window.DeviceOrientationEvent;
   const sluchaj=()=>{
     const on=e=>{
+      if(gpsAktualny()) return;            // w ruchu GPS jest lepszy
       let h=null;
-      if(typeof e.webkitCompassHeading==="number") h=e.webkitCompassHeading;
-      else if(e.absolute&&typeof e.alpha==="number") h=(360-e.alpha)%360;
-      if(h!=null){ heading=h; pokazKompas(); }
+      if(typeof e.webkitCompassHeading==="number"){
+        h=e.webkitCompassHeading;
+        if(typeof e.webkitCompassAccuracy==="number") kompasAcc=e.webkitCompassAccuracy;
+      } else if(e.absolute&&typeof e.alpha==="number") h=(360-e.alpha)%360;
+      if(h==null||isNaN(h)) return;
+      heading=dodajOdczyt(h); zrodloKursu="magnet"; pokazKompas();
+      if(!ostrzezonoOKompasie&&bufor.length>=12&&kompasPewnosc<0.7){
+        ostrzezonoOKompasie=true;
+        powiedz("Kompas daje niestabilne odczyty. Zakreśl telefonem ósemkę w powietrzu, "+
+                "żeby go skalibrować, albo odejdź od metalu.");
+      }
     };
     window.addEventListener("deviceorientationabsolute",on,true);
     window.addEventListener("deviceorientation",on,true);
@@ -752,31 +796,67 @@ $("powtorz").onclick=()=>{
 const zdanie=it=>(it.nazwaMowa?it.nazwaMowa+", "+it.opis:it.opis)+
   ", "+metry(it.d)+", "+kierunekMowa(it.az)+".";
 
+/* ===== FILTR KIERUNKOWY =====
+   Z celem: korytarz wzdłuż prostej do celu — liczy się odchylenie boczne,
+   bo obiekt 5 m od trasy jest na drodze, a 30 m od niej już nie.
+   Bez celu: wycinek przed tobą, mniej więcej od jedenastej do pierwszej. */
+const KORYTARZ=15;   // metrów odchylenia od prostej do celu
+const roznicaKatow=d=>{ d=((d%360)+360)%360; return d>180?360-d:d; };
+
+function naKursie(it){
+  if(cel&&pt){
+    const azCel=azymut(pt.lat,pt.lon,cel.la,cel.lo);
+    const dCel=dist(pt.lat,pt.lon,cel.la,cel.lo);
+    if(it.d>dCel+20) return false;              // już za celem
+    const odchyl=roznicaKatow(it.az-azCel);
+    if(odchyl>90) return false;                 // za plecami względem trasy
+    return Math.abs(it.d*Math.sin(odchyl*Math.PI/180))<=KORYTARZ;
+  }
+  if(heading==null) return true;                // bez kompasu nie ma czego filtrować
+  return roznicaKatow(it.az-heading)<=sektor();
+}
+const trybFiltru=()=>cel?"na trasie do celu":heading!=null?"przed tobą":null;
+
 /* Głosem tylko to, co bliżej niż ZASIEG_MOWA. Przy przejściach i przeszkodach,
    gdy w tym promieniu nic nie ma, podaję jedno najbliższe dalej — cisza
    byłaby myląca, bo brzmi jak „nic tam nie ma”. */
 function opisSkanu(grupy,ktore,zNaglowkiem){
   const wybrane=SEKCJE.filter(s=>ktore.includes(s.id));
   const cz=[];
-  let ile=0;
-  for(const s of wybrane) ile+=grupy[s.id].filter(it=>it.d<=ZASIEG_MOWA).length;
+  const tryb=trybFiltru();
+  /* Filtr kierunkowy dotyczy zagrożeń. Sklepów i wejść przy 20 m jest tyle co nic,
+     a szukając ich człowiek nie patrzy akurat we właściwą stronę. */
+  const widok=s=>{
+    const b=grupy[s.id].filter(it=>it.d<=ZASIEG_MOWA);
+    return PILNE.includes(s.id)?b.filter(naKursie):b;
+  };
+  let ile=0, pominiete=0;
+  for(const s of wybrane){
+    const w=widok(s); ile+=w.length;
+    if(PILNE.includes(s.id))
+      pominiete+=grupy[s.id].filter(it=>it.d<=ZASIEG_MOWA).length-w.length;
+  }
 
   if(zNaglowkiem) cz.push(ile
-    ? "W promieniu "+metry(ZASIEG_MOWA)+": "+obiekty(ile)+"."
-    : "W promieniu "+metry(ZASIEG_MOWA)+" nic nie znaleziono.");
+    ? "W promieniu "+metry(ZASIEG_MOWA)+(tryb?", "+tryb:"")+": "+obiekty(ile)+"."
+    : "W promieniu "+metry(ZASIEG_MOWA)+(tryb?" "+tryb:"")+" nic nie znaleziono.");
 
   for(const s of wybrane){
-    const blisko=grupy[s.id].filter(it=>it.d<=ZASIEG_MOWA);
+    const blisko=widok(s);
     if(blisko.length){
       cz.push(s.label+": "+obiekty(blisko.length)+".");
       blisko.slice(0,5).forEach(it=>cz.push(zdanie(it)));
-    }else if(PILNE.includes(s.id)&&grupy[s.id].length){
-      cz.push("Dalej, poza "+metry(ZASIEG_MOWA)+": "+zdanie(grupy[s.id][0]));
+    }else if(PILNE.includes(s.id)){
+      const dalej=grupy[s.id].filter(naKursie)[0];
+      if(dalej&&dalej.d>ZASIEG_MOWA) cz.push("Dalej: "+zdanie(dalej));
     }
   }
+  if(zNaglowkiem&&pominiete)
+    cz.push("Pominąłem "+obiekty(pominiete)+" poza tym kierunkiem.");
   if(cz.length===(zNaglowkiem?1:0))
     return zNaglowkiem ? cz[0]+" To nie znaczy, że wokół nic nie ma." : "";
-  if(zNaglowkiem&&heading==null) cz.push("Kompas nieaktywny, kierunki podaję jako strony świata.");
+  if(zNaglowkiem&&heading==null&&!cel)
+    cz.push("Kompas nieaktywny, więc podaję wszystko dookoła, nie tylko to przed tobą.");
   return cz.join(" ");
 }
 
@@ -787,7 +867,8 @@ $("marsz").onclick=()=>{
   zapowiedziane=new Set();
   $("marsz").textContent="Zakończ marsz";
   powiedz("Tryb marszu włączony. Ostrzegam o przejściach i przeszkodach bliżej niż "+
-    metry(ZASIEG_MOWA)+".",{przerwij:true});
+    metry(ZASIEG_MOWA)+", "+(trybFiltru()||"dookoła, bo kompas jest nieaktywny")+".",
+    {przerwij:true});
   ostrzezOdokladnosci();
   watchId=navigator.geolocation.watchPosition(wKroku,
     e=>powiedz("Utracono pozycję. "+e.message),
@@ -810,7 +891,7 @@ async function wKroku(p){
   const teraz=Date.now();
   if(teraz-ostatniaZapowiedz<6000) return;
   for(const kat of PILNE){
-    const it=grupy[kat].find(x=>!x.cichy&&x.d<=ZASIEG_MOWA&&!zapowiedziane.has(x.id));
+    const it=grupy[kat].find(x=>!x.cichy&&x.d<=ZASIEG_MOWA&&naKursie(x)&&!zapowiedziane.has(x.id));
     if(!it) continue;
     zapowiedziane.add(it.id);
     ostatniaZapowiedz=teraz;
@@ -847,23 +928,85 @@ function zapowiedzCel(){
 }
 
 /* ============ ADRES ============ */
+/* Porównanie bez polskich znaków — „Zielona” znajdzie się po wpisaniu „zielona”,
+   a dyktowanie rzadko trafia w ogonki. */
+const bezOgonkow=s=>String(s).toLowerCase()
+  .replace(/ą/g,"a").replace(/ć/g,"c").replace(/ę/g,"e").replace(/ł/g,"l")
+  .replace(/ń/g,"n").replace(/ó/g,"o").replace(/ś/g,"s").replace(/ź/g,"z").replace(/ż/g,"z");
+
+function szukajLokalnie(q){
+  const tok=bezOgonkow(q).split(/[\s,]+/).filter(Boolean);
+  if(!tok.length) return [];
+  const trafienia=[];
+  for(const r of okolica.rek){
+    const t=r.t;
+    const tekst=[t.name,t["addr:street"],t["addr:housenumber"],t.operator,t.brand]
+      .filter(Boolean).join(" ");
+    if(!tekst) continue;
+    const n=bezOgonkow(tekst);
+    if(!tok.every(x=>n.includes(x))) continue;
+    const np=najblizszy(r,pt); if(!np) continue;
+    const et=etykieta(t);
+    trafienia.push({la:np.la, lo:np.lo, d:np.d,
+      nazwa:et?et.ekran:tekst, nazwaMowa:et?et.mowa:tekst});
+  }
+  trafienia.sort((a,b)=>a.d-b.d);
+  const widziane=new Set(), out=[];
+  for(const w of trafienia){
+    if(widziane.has(w.nazwa)) continue;
+    widziane.add(w.nazwa); out.push(w);
+    if(out.length>=8) break;
+  }
+  return out;
+}
+function pokazWyniki(lista){
+  $("sugg").innerHTML="";
+  lista.forEach(w=>{
+    const li=document.createElement("li");
+    const b=document.createElement("button");
+    b.type="button";
+    b.textContent=w.nazwa+(w.d!=null?" — "+w.d+" m":"");
+    b.onclick=()=>{ ustawCel(w); $("sugg").innerHTML=""; };
+    li.appendChild(b); $("sugg").appendChild(li);
+  });
+}
+
 async function findAddr(){
   const q=$("addr").value.trim();
   if(q.length<3) return powiedz("Wpisz co najmniej trzy znaki.");
-  powiedz("Szukam adresu."); $("sugg").innerHTML="";
+  $("sugg").innerHTML="";
+
+  /* Najpierw pobrany obszar: bez internetu i bez ryzyka, że podpowie
+     ulicę o tej samej nazwie w drugim końcu Polski. */
+  if(maszLokalne()){
+    const lok=szukajLokalnie(q);
+    if(lok.length){
+      powiedz("Znaleziono "+obiekty(lok.length)+" w pobranym obszarze. Wybierz z listy.",{przerwij:true});
+      return pokazWyniki(lok);
+    }
+    powiedz("W pobranym obszarze nic takiego nie ma. Pytam serwer.",{przerwij:true});
+  }else{
+    powiedz("Szukam adresu.",{przerwij:true});
+  }
+
+  /* Zapasowo Nominatim, ale zamknięty w tym samym prostokącie. */
   try{
-    const r=await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5"+
-      "&countrycodes=pl&q="+encodeURIComponent(q));
-    const d=await r.json();
-    if(!d.length) return powiedz("Nie znaleziono takiego adresu.");
-    powiedz("Znaleziono "+d.length+". Wybierz z listy.");
-    d.forEach(x=>{
-      const li=document.createElement("li");
-      const b=document.createElement("button");
-      b.type="button"; b.textContent=x.display_name;
-      b.onclick=()=>{ ustawCel({la:+x.lat, lo:+x.lon, nazwa:x.display_name.split(",")[0]}); $("sugg").innerHTML=""; };
-      li.appendChild(b); $("sugg").appendChild(li);
-    });
+    let url="https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6"+
+      "&countrycodes=pl&q="+encodeURIComponent(q);
+    if(okolica){
+      const bb=okolica.bbox;  // [poludnie, polnoc, zachod, wschod]
+      url+="&bounded=1&viewbox="+bb[2]+","+bb[1]+","+bb[3]+","+bb[0];
+    }
+    const d=await (await fetch(url)).json();
+    if(!d.length) return powiedz(okolica
+      ? "Nie znaleziono tego w okolicy."
+      : "Nie znaleziono takiego adresu.");
+    powiedz("Znaleziono "+obiekty(d.length)+". Wybierz z listy.");
+    pokazWyniki(d.map(x=>{
+      const nazwa=x.display_name.split(",").slice(0,2).join(",").trim();
+      return {la:+x.lat, lo:+x.lon, nazwa, nazwaMowa:numerSlownie(nazwa),
+              d: pt?dist(pt.lat,pt.lon,+x.lat,+x.lon):null};
+    }));
   }catch(e){ powiedz("Wyszukiwarka adresów nie odpowiada."); }
 }
 $("find").onclick=findAddr;
