@@ -3,224 +3,193 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#2b2d31">
+<meta name="theme-color" content="#111416">
 <title>Otoczenie</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&display=swap">
 <style>
-/* Układ: jedna kolumna pod kciuk — pozycja, promień, wynik wg wagi dla działki */
+/* Układ: pionowy stos wielkich przycisków, treść czytana głosem.
+   Kontrast wysoki — wersja testowa używana też przez osoby słabowidzące. */
 :root{
-  --bg:#f5f4f0; --surface:#fff; --fg:#1b1a17; --muted:#6e6a62; --line:#e0ddd5;
-  --accent:#8a5a2b; --accent-soft:rgba(138,90,43,.1);
-  --alarm:#a93226; --alarm-soft:rgba(169,50,38,.1);
-  --good:#2f6f4e; --good-soft:rgba(47,111,78,.1);
-  --display:"Archivo",system-ui,sans-serif;
-  --body:system-ui,-apple-system,"Segoe UI",sans-serif;
+  --bg:#ffffff; --fg:#101214; --muted:#55595e; --line:#c7ccd1;
+  --accent:#00407a; --accent-fg:#ffffff;
+  --alarm:#8c1d14; --alarm-soft:#fdeceb;
+  --good:#17532f; --good-soft:#e8f4ec;
+  --font:system-ui,-apple-system,"Segoe UI",sans-serif;
   --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
-    --bg:#16171a; --surface:#1e2024; --fg:#e9e7e2; --muted:#98948c; --line:#31343a;
-    --accent:#d99b5e; --accent-soft:rgba(217,155,94,.13);
-    --alarm:#f08478; --alarm-soft:rgba(240,132,120,.13);
-    --good:#6fcf9a; --good-soft:rgba(111,207,154,.13);
+    --bg:#0d0f11; --fg:#f2f4f6; --muted:#a4abb2; --line:#3a4046;
+    --accent:#7fb6ff; --accent-fg:#06121f;
+    --alarm:#ff9f95; --alarm-soft:#2a1512;
+    --good:#7fe0a6; --good-soft:#102418;
     color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#16171a; --surface:#1e2024; --fg:#e9e7e2; --muted:#98948c; --line:#31343a;
-  --accent:#d99b5e; --accent-soft:rgba(217,155,94,.13);
-  --alarm:#f08478; --alarm-soft:rgba(240,132,120,.13);
-  --good:#6fcf9a; --good-soft:rgba(111,207,154,.13);
+  --bg:#0d0f11; --fg:#f2f4f6; --muted:#a4abb2; --line:#3a4046;
+  --accent:#7fb6ff; --accent-fg:#06121f;
+  --alarm:#ff9f95; --alarm-soft:#2a1512;
+  --good:#7fe0a6; --good-soft:#102418;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
 html,body{margin:0}
-body{background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);
-  padding-block:20px 60px;padding-left:16px;padding-right:16px;-webkit-text-size-adjust:100%}
-.wrap{max-width:620px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
-h1{font-family:var(--display);font-size:25px;font-weight:700;margin:0;letter-spacing:-.02em}
-.tag{font-size:13px;color:var(--muted);margin:2px 0 6px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:15px}
-label{display:block;font-size:12px;font-weight:600;letter-spacing:.05em;
-  text-transform:uppercase;color:var(--muted);margin-bottom:7px}
-input{width:100%;font:inherit;padding:11px 12px;border:1px solid var(--line);
-  border-radius:9px;background:var(--bg);color:var(--fg)}
-input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-button{font:inherit;font-weight:600;border-radius:9px;cursor:pointer;
-  border:1px solid var(--accent);background:var(--accent);color:#fff;padding:11px 15px}
+body{background:var(--bg);color:var(--fg);font:18px/1.5 var(--font);
+  padding-block:16px 48px;padding-left:16px;padding-right:16px;-webkit-text-size-adjust:100%}
+.wrap{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+h1{font-size:26px;font-weight:800;margin:0;letter-spacing:-.02em}
+h2{font-size:19px;font-weight:700;margin:0}
+.tag{font-size:15px;color:var(--muted);margin:4px 0 0}
+
+/* ekran startowy — jedno dotknięcie odblokowuje mowę i uprawnienia */
+#start{position:fixed;inset:0;z-index:50;background:var(--accent);color:var(--accent-fg);
+  border:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:18px;padding:32px;font:inherit;text-align:center;cursor:pointer}
+#start .duze{font-size:34px;font-weight:800;line-height:1.2}
+#start .male{font-size:17px;max-width:30ch;opacity:.92}
+
+button{font:inherit;font-weight:700;border-radius:14px;cursor:pointer;
+  border:2px solid var(--accent);background:var(--accent);color:var(--accent-fg);
+  padding:18px 16px;min-height:60px;width:100%}
 button.ghost{background:transparent;color:var(--accent)}
 button:disabled{opacity:.45;cursor:default}
-.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-.row>*{flex:1 1 auto;min-width:0}
-.big{width:100%;padding:14px;font-size:17px;margin-top:10px}
-.chips{display:flex;gap:7px;flex-wrap:wrap}
-.chip{flex:0 0 auto;padding:9px 15px;border-radius:999px;border:1px solid var(--line);
-  background:transparent;color:var(--fg);font-size:14px;font-weight:600}
-.chip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
-.gdzie{margin-top:11px;font-size:14px;line-height:1.45}
-.gdzie b{font-family:var(--display)}
-.coords{font-family:var(--mono);font-size:12.5px;color:var(--muted);
-  font-variant-numeric:tabular-nums;display:block;margin-top:2px}
-.kompas{display:flex;align-items:center;gap:10px;margin-top:11px;font-size:14px;color:var(--muted)}
-.igla{width:34px;height:34px;flex:0 0 auto;border:1px solid var(--line);border-radius:50%;
-  position:relative;background:var(--bg)}
-.igla::after{content:"";position:absolute;left:50%;top:5px;width:2px;height:13px;
-  background:var(--alarm);transform-origin:50% 100%;translate:-50% 0}
-.igla[data-off="1"]{opacity:.3}
-.hits{display:none;flex-direction:column;gap:12px}
-.sect{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.sect.alarm{border-color:var(--alarm)}
-.shead{display:flex;align-items:baseline;gap:9px;padding:13px 15px;
-  font-family:var(--display);font-weight:600;font-size:16px}
-.sect.alarm .shead{background:var(--alarm-soft)}
-.count{margin-left:auto;font-family:var(--mono);font-size:12.5px;color:var(--muted);
-  font-variant-numeric:tabular-nums;font-weight:400}
-.item{display:flex;gap:10px;align-items:baseline;padding:10px 15px;
-  border-top:1px solid var(--line);font-size:15px}
-.item .nm{flex:1 1 auto;min-width:0}
-.item .kind{display:block;font-size:12.5px;color:var(--muted);margin-top:1px}
-.dist{flex:0 0 auto;font-family:var(--mono);font-size:13.5px;
-  font-variant-numeric:tabular-nums;color:var(--muted);text-align:right}
-.dist.near{color:var(--alarm);font-weight:600}
-.dist small{display:block;font-family:var(--body);font-size:11.5px;font-weight:400}
-a.map{flex:0 0 auto;color:var(--accent);text-decoration:none;font-size:13px;font-weight:600}
-.note{font-size:13.5px;color:var(--muted);padding:11px 15px;border-top:1px solid var(--line)}
-.status{font-size:14px;padding:12px 14px;border-radius:9px;background:var(--accent-soft);
-  color:var(--accent);font-weight:600;display:none;white-space:pre-line}
+button:focus-visible{outline:4px solid var(--fg);outline-offset:3px}
+.glowny{font-size:23px;min-height:96px}
+.para{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.para button{width:100%}
+.card{background:transparent;border:2px solid var(--line);border-radius:16px;padding:16px}
+.gdzie{font-size:19px;font-weight:700;margin:0}
+.coords{display:block;font-family:var(--mono);font-size:13px;color:var(--muted);
+  font-weight:400;margin-top:4px;font-variant-numeric:tabular-nums}
+.kompas{font-size:16px;color:var(--muted);margin:10px 0 0}
+.tempo{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:16px}
+.tempo button{width:64px;min-height:52px;padding:0;font-size:24px}
+.tempo span{flex:1 1 auto;text-align:center}
+
+.status{font-size:17px;font-weight:700;padding:14px;border-radius:12px;
+  background:var(--good-soft);color:var(--good);display:none;white-space:pre-line}
 .status.err{background:var(--alarm-soft);color:var(--alarm)}
-.status.ok{background:var(--good-soft);color:var(--good)}
-.sugg{list-style:none;margin:9px 0 0;padding:0;display:flex;flex-direction:column;gap:5px}
-.sugg button{width:100%;text-align:left;background:transparent;color:var(--fg);
-  border:1px solid var(--line);font-weight:400;font-size:14px;padding:10px 12px}
+.hits{display:none;flex-direction:column;gap:12px}
+.sect{border:2px solid var(--line);border-radius:16px;overflow:hidden}
+.sect.alarm{border-color:var(--alarm)}
+.shead{display:flex;align-items:baseline;gap:10px;padding:14px 16px;font-weight:700}
+.sect.alarm .shead{background:var(--alarm-soft);color:var(--alarm)}
+.count{margin-left:auto;font-family:var(--mono);font-size:14px;color:var(--muted);font-weight:400}
+.item{display:flex;gap:12px;align-items:center;padding:12px 16px;border-top:2px solid var(--line)}
+.item .nm{flex:1 1 auto;min-width:0;font-size:17px}
+.item .kind{display:block;font-size:14px;color:var(--muted)}
+.dist{flex:0 0 auto;font-family:var(--mono);font-size:16px;font-weight:700;
+  font-variant-numeric:tabular-nums;text-align:right}
+.dist small{display:block;font-family:var(--font);font-size:13px;font-weight:400;color:var(--muted)}
+.item button{width:auto;min-height:48px;padding:10px 14px;font-size:15px;flex:0 0 auto}
+.note{font-size:15px;color:var(--muted);padding:12px 16px;border-top:2px solid var(--line)}
+.sugg{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.sugg button{text-align:left;background:transparent;color:var(--fg);border-color:var(--line);
+  font-weight:400;font-size:16px;padding:14px}
+input{width:100%;font:inherit;padding:14px;border:2px solid var(--line);
+  border-radius:12px;background:var(--bg);color:var(--fg);min-height:56px}
+input:focus-visible{outline:4px solid var(--accent);outline-offset:2px}
+.ostrzezenie{border:2px solid var(--alarm);background:var(--alarm-soft);color:var(--alarm);
+  border-radius:12px;padding:14px;font-size:15px;font-weight:600}
 </style>
 </head>
 <body>
-<div class="wrap">
 
+<button id="start" type="button">
+  <span class="duze">Dotknij ekranu,<br>aby rozpocząć</span>
+  <span class="male">Włączy się głos, lokalizacja i kompas.</span>
+</button>
+
+<div class="wrap">
   <header>
     <h1>Otoczenie</h1>
-    <p class="tag">Wszystko, co mapa zna w promieniu do 100 m — budynki, numery, firmy, teren.
-      Odległość i kierunek do najbliższego punktu obiektu.</p>
+    <p class="tag">Wersja testowa. Pomoc w orientacji, nie zamiennik laski ani psa przewodnika.</p>
   </header>
 
-  <div class="card">
-    <label for="addr">Adres lub miejscowość</label>
-    <input id="addr" type="search" placeholder="np. Grodzisk Mazowiecki, Ogrodowa 12"
-           autocomplete="off" enterkeyhint="search">
-    <ul class="sugg" id="sugg"></ul>
-    <div class="row">
-      <button class="ghost" id="find" type="button">Szukaj</button>
-      <button class="ghost" id="mic" type="button" hidden>Dyktuj</button>
-      <button class="ghost" id="gps" type="button">Moja pozycja</button>
-    </div>
-    <div class="gdzie" id="gdzie">Nie wybrano punktu.</div>
-    <div class="kompas">
-      <span class="igla" id="igla" data-off="1"></span>
-      <span id="kompasTxt">Kompas wyłączony.</span>
-      <button class="ghost" id="kompasBtn" type="button" style="flex:0 0 auto;padding:7px 12px">Włącz</button>
-    </div>
+  <div class="ostrzezenie">
+    Dane pochodzą z OpenStreetMap i bywają niekompletne. Brak przejścia w bazie nie znaczy,
+    że przejścia nie ma. Nie podejmuj na tej podstawie decyzji o wejściu na jezdnię.
   </div>
 
   <div class="card">
-    <label>Promień</label>
-    <div class="chips" id="radii"></div>
-    <button class="big" id="go" type="button" disabled>Sprawdź otoczenie</button>
-    <div class="row">
-      <button class="ghost" id="czytaj" type="button" disabled>Czytaj na głos</button>
-      <button class="ghost" id="stop" type="button" hidden>Zatrzymaj</button>
+    <p class="gdzie" id="gdzie">Nie ustalono pozycji.</p>
+    <p class="kompas" id="kompasTxt">Kompas wyłączony.</p>
+    <div class="tempo">
+      <button class="ghost" id="wolniej" type="button" aria-label="Mów wolniej">−</button>
+      <span id="tempoTxt">Tempo mowy 1,0</span>
+      <button class="ghost" id="szybciej" type="button" aria-label="Mów szybciej">+</button>
+    </div>
+  </div>
+
+  <button class="glowny" id="skanuj" type="button">Skanuj otoczenie</button>
+
+  <div class="para">
+    <button class="ghost" id="marsz" type="button">Tryb marszu</button>
+    <button class="ghost" id="powtorz" type="button">Powtórz</button>
+  </div>
+
+  <div class="card">
+    <h2>Prowadzenie do celu</h2>
+    <p class="tag" id="celTxt">Nie wybrano celu. Po skanowaniu naciśnij „Prowadź” przy obiekcie.</p>
+    <button class="ghost" id="celStop" type="button" hidden>Zakończ prowadzenie</button>
+  </div>
+
+  <div class="card">
+    <h2>Szukaj adresu</h2>
+    <input id="addr" type="search" placeholder="miejscowość i ulica" autocomplete="off" enterkeyhint="search">
+    <ul class="sugg" id="sugg"></ul>
+    <div class="para" style="margin-top:10px">
+      <button class="ghost" id="find" type="button">Szukaj</button>
+      <button class="ghost" id="mic" type="button" hidden>Dyktuj</button>
     </div>
   </div>
 
   <div class="status" id="status"></div>
   <div class="hits" id="hits"></div>
-
 </div>
+
 <script>
 "use strict";
 const HOST="https://overpass-api.de";
 const $=id=>document.getElementById(id);
-let pt=null, radius=100, heading=null, ostatni=null;
+const ZASIEG=100;      // metry pokazywane i czytane
+const CACHE_R=300;     // metry pobierane z serwera za jednym razem
+const ODSWIEZ_PO=120;  // po tylu metrach marszu dociągamy nowe dane
 
-/* ---------- promienie ---------- */
-[25,50,75,100].forEach(r=>{
-  const b=document.createElement("button");
-  b.type="button"; b.className="chip"; b.textContent=r+" m";
-  b.setAttribute("aria-pressed", String(r===radius));
-  b.onclick=()=>{ radius=r;
-    [...$("radii").children].forEach(c=>c.setAttribute("aria-pressed","false"));
-    b.setAttribute("aria-pressed","true"); };
-  $("radii").appendChild(b);
-});
+let pt=null, heading=null, tempo=1.0;
+let cache=null, ostatniSkan=null, cel=null;
+let watchId=null, zapowiedziane=new Set(), ostatniaZapowiedz=0, ostatniPobor=0;
 
-/* ---------- słownik rodzajów ----------
-   Kolejność decyduje o przypisaniu: pierwszy pasujący wpis wygrywa. */
-const UCIAZLIWE="uciazliwe", FIRMY="firmy", BUDYNKI="budynki", TEREN="teren";
-const WPISY=[
-  [t=>/^(motorway|trunk|primary)$/.test(t.highway||""), UCIAZLIWE, "droga o dużym ruchu"],
-  [t=>t.railway==="rail", UCIAZLIWE, "linia kolejowa"],
-  [t=>t.landuse==="industrial"||t.man_made==="works", UCIAZLIWE, "teren przemysłowy"],
-  [t=>t.man_made==="wastewater_plant", UCIAZLIWE, "oczyszczalnia ścieków"],
-  [t=>t.landuse==="landfill"||t.amenity==="waste_transfer_station", UCIAZLIWE, "składowisko odpadów"],
-  [t=>t.power==="substation", UCIAZLIWE, "stacja transformatorowa"],
-  [t=>t.power==="line"||t.power==="minor_line", UCIAZLIWE, "linia energetyczna"],
-  [t=>/^(mast|communications_tower)$/.test(t.man_made||""), UCIAZLIWE, "maszt"],
-  [t=>!!t.aeroway, UCIAZLIWE, "lotnisko"],
+try{ const t=parseFloat(localStorage.getItem("otoczenie:tempo")); if(t>0.5&&t<3) tempo=t; }catch(e){}
 
-  [t=>t.shop==="supermarket", FIRMY, "supermarket"],
-  [t=>!!t.shop, FIRMY, "sklep"],
-  [t=>!!t.office, FIRMY, "biuro"],
-  [t=>!!t.craft, FIRMY, "zakład rzemieślniczy"],
-  [t=>t.amenity==="pharmacy", FIRMY, "apteka"],
-  [t=>/^(doctors|clinic|dentist)$/.test(t.amenity||"")||!!t.healthcare, FIRMY, "przychodnia"],
-  [t=>t.amenity==="hospital", FIRMY, "szpital"],
-  [t=>t.amenity==="school", FIRMY, "szkoła"],
-  [t=>t.amenity==="kindergarten", FIRMY, "przedszkole"],
-  [t=>/^(restaurant|cafe|bar|fast_food|pub)$/.test(t.amenity||""), FIRMY, "gastronomia"],
-  [t=>t.amenity==="fuel", FIRMY, "stacja paliw"],
-  [t=>/^(bank|atm|post_office)$/.test(t.amenity||""), FIRMY, "bank lub poczta"],
-  [t=>/^(hotel|guest_house|motel)$/.test(t.tourism||""), FIRMY, "nocleg"],
-  [t=>!!t.amenity, FIRMY, "obiekt usługowy"],
-
-  [t=>!!t["addr:housenumber"], BUDYNKI, "adres"],
-  [t=>t.building==="house"||t.building==="detached", BUDYNKI, "dom"],
-  [t=>t.building==="apartments", BUDYNKI, "blok mieszkalny"],
-  [t=>t.building==="garage"||t.building==="garages", BUDYNKI, "garaż"],
-  [t=>!!t.building, BUDYNKI, "budynek"],
-
-  [t=>t.highway==="bus_stop", TEREN, "przystanek"],
-  [t=>/^(station|halt|tram_stop)$/.test(t.railway||""), TEREN, "stacja"],
-  [t=>!!t.highway, TEREN, "droga"],
-  [t=>!!t.railway, TEREN, "tory"],
-  [t=>t.leisure==="playground", TEREN, "plac zabaw"],
-  [t=>!!t.leisure, TEREN, "teren rekreacyjny"],
-  [t=>t.natural==="water"||!!t.waterway, TEREN, "woda"],
-  [t=>!!t.natural, TEREN, "teren naturalny"],
-  [t=>!!t.landuse, TEREN, "teren"],
-  [t=>!!t.barrier, TEREN, "ogrodzenie"],
-  [t=>!!t.man_made||!!t.power, TEREN, "obiekt techniczny"],
-  [t=>!!t.tourism, TEREN, "obiekt turystyczny"]
-];
-const SEKCJE=[
-  {id:UCIAZLIWE, label:"Uciążliwości", alarm:true, near:50},
-  {id:FIRMY,     label:"Firmy i usługi"},
-  {id:BUDYNKI,   label:"Budynki i adresy"},
-  {id:TEREN,     label:"Teren i infrastruktura"}
-];
-
-function rozpoznaj(t){
-  for(const [gdy,kat,opis] of WPISY) if(gdy(t)) return {kat,opis};
-  return null;
+/* ================= MOWA ================= */
+const Synteza=window.speechSynthesis;
+const kolejka=[]; let mowi=false;
+function powiedz(txt,{przerwij=false}={}){
+  if(!Synteza) return;
+  if(przerwij){ Synteza.cancel(); kolejka.length=0; mowi=false; }
+  kolejka.push(txt);
+  nastepne();
 }
-function etykieta(t){
-  if(t.name) return t.name;
-  const nr=t["addr:housenumber"], ul=t["addr:street"];
-  if(nr) return ul ? ul+" "+nr : "nr "+nr;
-  return t.operator||t.brand||null;
+function nastepne(){
+  if(mowi||!kolejka.length||!Synteza) return;
+  const u=new SpeechSynthesisUtterance(kolejka.shift());
+  u.lang="pl-PL"; u.rate=tempo;
+  mowi=true;
+  u.onend=u.onerror=()=>{ mowi=false; nastepne(); };
+  Synteza.speak(u);
 }
+function pokazTempo(){
+  $("tempoTxt").textContent="Tempo mowy "+tempo.toFixed(1).replace(".",",");
+  try{ localStorage.setItem("otoczenie:tempo",String(tempo)); }catch(e){}
+}
+$("wolniej").onclick=()=>{ tempo=Math.max(0.6,+(tempo-0.1).toFixed(1)); pokazTempo(); powiedz("Tempo "+tempo.toFixed(1).replace(".",","),{przerwij:true}); };
+$("szybciej").onclick=()=>{ tempo=Math.min(2.5,+(tempo+0.1).toFixed(1)); pokazTempo(); powiedz("Tempo "+tempo.toFixed(1).replace(".",","),{przerwij:true}); };
+pokazTempo();
 
-/* ---------- geometria ---------- */
+function wibruj(ms){ try{ navigator.vibrate&&navigator.vibrate(ms); }catch(e){} }
+
+/* ================= GEOMETRIA ================= */
 function dist(a,b,c,d){
   const R=6371000,p=Math.PI/180;
   const dla=(c-a)*p,dlo=(d-b)*p;
@@ -236,50 +205,119 @@ function azymut(a,b,c,d){
 const STRONY=["północ","północny wschód","wschód","południowy wschód",
               "południe","południowy zachód","zachód","północny zachód"];
 const strona=az=>STRONY[Math.round(az/45)%8];
-function wzgledem(az){
+/* Tarcza zegara liczona względem kierunku patrzenia. */
+function godzina(az){
   if(heading==null) return null;
   const d=((az-heading)%360+360)%360;
-  if(d<23||d>=337) return "przed tobą";
-  if(d<68) return "przed tobą w prawo";
-  if(d<113) return "po prawej";
-  if(d<158) return "za tobą w prawo";
-  if(d<203) return "za tobą";
-  if(d<248) return "za tobą w lewo";
-  if(d<293) return "po lewej";
-  return "przed tobą w lewo";
+  const g=Math.round(d/30);
+  return g===0?12:g;
 }
-function najblizszy(el){
+function kierunekSlownie(az){
+  const g=godzina(az);
+  return g!=null ? "na godzinie "+g : "na "+strona(az);
+}
+function najblizszy(el,skad){
   const pts=[];
   if(Array.isArray(el.geometry)) pts.push(...el.geometry);
   if(Array.isArray(el.members)) el.members.forEach(m=>{ if(Array.isArray(m.geometry)) pts.push(...m.geometry); });
   if(!pts.length){
     const la=el.lat??el.center?.lat, lo=el.lon??el.center?.lon;
-    return (la==null||lo==null)?null:{la,lo,d:dist(pt.lat,pt.lon,la,lo)};
+    return (la==null||lo==null)?null:{la,lo,d:dist(skad.lat,skad.lon,la,lo)};
   }
   let best=null;
   for(const g of pts){
     if(g.lat==null) continue;
-    const d=dist(pt.lat,pt.lon,g.lat,g.lon);
+    const d=dist(skad.lat,skad.lon,g.lat,g.lon);
     if(!best||d<best.d) best={la:g.lat,lo:g.lon,d};
   }
   return best;
 }
-const fmt=m=>m+" m";
-function setStatus(msg,kind){
-  const s=$("status");
-  if(!msg){ s.style.display="none"; return; }
-  s.textContent=msg; s.className="status"+(kind?" "+kind:""); s.style.display="block";
+
+/* ================= CO JEST WAŻNE DLA PIESZEGO ================= */
+const PRZEJSCIA="przejscia", PRZESZKODY="przeszkody", WEJSCIA="wejscia",
+      TRANSPORT="transport", USLUGI="uslugi", ULICE="ulice";
+
+const WPISY=[
+  [t=>t.highway==="crossing"||t.footway==="crossing", PRZEJSCIA, t=>{
+    const s=[];
+    if(t.crossing==="traffic_signals"||t["crossing:signals"]==="yes") s.push("z sygnalizacją");
+    if(t["traffic_signals:sound"]==="yes"||t["traffic_signals:vibration"]==="yes") s.push("dźwiękowa");
+    if(t.tactile_paving==="yes") s.push("z pasami ostrzegawczymi");
+    if(t.tactile_paving==="no") s.push("bez pasów ostrzegawczych");
+    return "przejście dla pieszych"+(s.length?", "+s.join(", "):"");
+  }],
+  [t=>t.highway==="traffic_signals", PRZEJSCIA, t=>
+    "sygnalizacja świetlna"+(t["traffic_signals:sound"]==="yes"?" z sygnałem dźwiękowym":"")],
+
+  [t=>t.highway==="steps", PRZESZKODY, t=>
+    "schody"+(t.step_count?", "+t.step_count+" stopni":"")+(t.handrail==="yes"?", z poręczą":"")],
+  [t=>t.barrier==="kerb"||t.kerb, PRZESZKODY, t=>
+    "krawężnik"+(t.kerb==="lowered"?" obniżony":t.kerb==="raised"?" wysoki":"")],
+  [t=>t.barrier==="bollard", PRZESZKODY, ()=>"słupek"],
+  [t=>t.barrier==="gate"||t.barrier==="lift_gate", PRZESZKODY, ()=>"brama"],
+  [t=>!!t.barrier, PRZESZKODY, ()=>"przeszkoda, ogrodzenie"],
+  [t=>t.highway==="construction"||t.building==="construction", PRZESZKODY, ()=>"roboty, budowa"],
+  [t=>t.man_made==="street_lamp"||t.highway==="street_lamp", PRZESZKODY, ()=>"latarnia"],
+  [t=>t.amenity==="bicycle_parking"||t.amenity==="motorcycle_parking", PRZESZKODY, ()=>"stojaki"],
+
+  [t=>!!t.entrance, WEJSCIA, t=>{
+    const s=[];
+    if(t.wheelchair==="yes") s.push("dostępne dla wózków");
+    if(t.automatic_door==="yes") s.push("drzwi automatyczne");
+    if(t.entrance==="main") s.push("wejście główne");
+    return (s.length?s.join(", "):"wejście");
+  }],
+
+  [t=>t.highway==="bus_stop"||t.public_transport==="platform", TRANSPORT, t=>
+    "przystanek"+(t.tactile_paving==="yes"?" z pasami ostrzegawczymi":"")],
+  [t=>t.railway==="tram_stop", TRANSPORT, ()=>"przystanek tramwajowy"],
+  [t=>/^(station|halt)$/.test(t.railway||""), TRANSPORT, ()=>"stacja kolejowa"],
+
+  [t=>t.shop==="supermarket", USLUGI, ()=>"supermarket"],
+  [t=>!!t.shop, USLUGI, ()=>"sklep"],
+  [t=>t.amenity==="pharmacy", USLUGI, ()=>"apteka"],
+  [t=>/^(doctors|clinic|dentist|hospital)$/.test(t.amenity||""), USLUGI, ()=>"placówka zdrowia"],
+  [t=>/^(restaurant|cafe|bar|fast_food|pub)$/.test(t.amenity||""), USLUGI, ()=>"lokal gastronomiczny"],
+  [t=>/^(bank|atm|post_office)$/.test(t.amenity||""), USLUGI, ()=>"bank lub poczta"],
+  [t=>!!t.office, USLUGI, ()=>"biuro"],
+  [t=>!!t.amenity, USLUGI, ()=>"obiekt usługowy"],
+  [t=>!!t["addr:housenumber"], WEJSCIA, ()=>"adres"],
+
+  [t=>t.highway==="footway"||t.highway==="path", ULICE, t=>
+    "chodnik"+(t.tactile_paving==="yes"?" z pasami ostrzegawczymi":"")],
+  [t=>/^(motorway|trunk|primary|secondary)$/.test(t.highway||""), ULICE, ()=>"ulica o dużym ruchu"],
+  [t=>!!t.highway, ULICE, ()=>"ulica"],
+  [t=>!!t.railway, ULICE, ()=>"tory"]
+];
+
+const SEKCJE=[
+  {id:PRZEJSCIA,  label:"Przejścia i sygnalizacja", alarm:true},
+  {id:PRZESZKODY, label:"Przeszkody", alarm:true},
+  {id:WEJSCIA,    label:"Wejścia i adresy"},
+  {id:TRANSPORT,  label:"Przystanki"},
+  {id:USLUGI,     label:"Sklepy i usługi"},
+  {id:ULICE,      label:"Ulice i chodniki"}
+];
+const PILNE=new Set([PRZEJSCIA,PRZESZKODY]);
+
+function rozpoznaj(t){
+  for(const [gdy,kat,opis] of WPISY) if(gdy(t)) return {kat, opis:opis(t)};
+  return null;
+}
+function etykieta(t){
+  if(t.name) return t.name;
+  const nr=t["addr:housenumber"], ul=t["addr:street"];
+  if(nr) return ul?ul+" "+nr:"numer "+nr;
+  return t.operator||t.brand||null;
 }
 
-/* ---------- punkt i adres ---------- */
-async function setPoint(lat,lon,label){
-  pt={lat:+lat,lon:+lon};
-  $("gdzie").innerHTML="<b>"+(label?esc(label):"Wybrany punkt")+"</b>"+
-    '<span class="coords">'+pt.lat.toFixed(5)+", "+pt.lon.toFixed(5)+"</span>";
-  $("go").disabled=false;
-  try{ localStorage.setItem("otoczenie:pt",JSON.stringify({...pt,label})); }catch(e){}
+/* ================= POZYCJA ================= */
+function pokazGdzie(txt,dokladnosc){
+  $("gdzie").innerHTML=esc(txt)+
+    (dokladnosc?' <span style="font-weight:400;color:var(--muted)">(±'+Math.round(dokladnosc)+" m)</span>":"")+
+    (pt?'<span class="coords">'+pt.lat.toFixed(5)+", "+pt.lon.toFixed(5)+"</span>":"");
 }
-async function adresDlaPunktu(){
+async function adresDlaPunktu(mow){
   try{
     const r=await fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18"+
       "&addressdetails=1&lat="+pt.lat+"&lon="+pt.lon);
@@ -288,202 +326,270 @@ async function adresDlaPunktu(){
     const nr=a.house_number||"";
     const m=a.city||a.town||a.village||a.municipality||"";
     const linia=[ul&&nr?ul+" "+nr:ul, m].filter(Boolean).join(", ");
-    if(linia) $("gdzie").innerHTML="<b>"+esc(linia)+"</b>"+
-      (nr?"":' <span style="color:var(--muted);font-size:13px">(bez numeru w OSM)</span>')+
-      '<span class="coords">'+pt.lat.toFixed(5)+", "+pt.lon.toFixed(5)+"</span>";
+    if(linia){
+      pokazGdzie(linia, pt.acc);
+      if(mow) powiedz("Jesteś przy "+linia+(nr?"":", numeru brak w bazie")+".");
+      return linia;
+    }
   }catch(e){}
+  return null;
 }
-try{
-  const s=JSON.parse(localStorage.getItem("otoczenie:pt")||"null");
-  if(s&&isFinite(s.lat)) setPoint(s.lat,s.lon,s.label);
-}catch(e){}
 
-$("gps").onclick=()=>{
-  if(!navigator.geolocation) return setStatus("Przeglądarka nie udostępnia lokalizacji.","err");
-  setStatus("Ustalam pozycję…");
+function ustawPozycje(lat,lon,acc){
+  pt={lat:+lat, lon:+lon, acc};
+  $("skanuj").disabled=false;
+}
+
+$("start").onclick=async()=>{
+  $("start").remove();
+  powiedz("Otoczenie, wersja testowa. To pomoc w orientacji, nie zamiennik laski ani psa przewodnika. "+
+          "Dane z mapy bywają niekompletne. Ustalam pozycję.");
+  wlaczKompas();
+  if(!navigator.geolocation){ powiedz("To urządzenie nie udostępnia lokalizacji."); return; }
   navigator.geolocation.getCurrentPosition(
     async p=>{
-      await setPoint(p.coords.latitude,p.coords.longitude,"Moja pozycja");
-      setStatus("Pozycja z dokładnością "+Math.round(p.coords.accuracy)+" m. Szukam adresu…");
-      await adresDlaPunktu();
-      setStatus("");
+      ustawPozycje(p.coords.latitude,p.coords.longitude,p.coords.accuracy);
+      pokazGdzie("Pozycja ustalona", p.coords.accuracy);
+      const a=await adresDlaPunktu(true);
+      if(!a) powiedz("Pozycja ustalona z dokładnością "+Math.round(p.coords.accuracy)+" metrów.");
+      powiedz("Naciśnij duży przycisk, aby zeskanować otoczenie.");
     },
-    e=>setStatus("Nie udało się pobrać pozycji: "+e.message,"err"),
-    {enableHighAccuracy:true,timeout:15000,maximumAge:30000}
+    e=>powiedz("Nie udało się ustalić pozycji. "+e.message),
+    {enableHighAccuracy:true,timeout:20000,maximumAge:10000}
   );
 };
 
-/* ---------- kompas ---------- */
-function ustawKierunek(h){
-  heading=h;
-  $("igla").dataset.off="0";
-  $("igla").style.setProperty("rotate", (-h)+"deg");
-  $("kompasTxt").textContent="Patrzysz na "+strona(h)+" ("+Math.round(h)+"°).";
-  if(ostatni) rysuj(ostatni.grupy,ostatni.via,true);
+/* ================= KOMPAS ================= */
+function pokazKompas(){
+  $("kompasTxt").textContent = heading==null
+    ? "Kompas wyłączony — kierunki podawane jako strony świata."
+    : "Patrzysz na "+strona(heading)+" ("+Math.round(heading)+"°).";
 }
-$("kompasBtn").onclick=async()=>{
-  const start=()=>{
+async function wlaczKompas(){
+  const D=window.DeviceOrientationEvent;
+  const sluchaj=()=>{
     const on=e=>{
       let h=null;
       if(typeof e.webkitCompassHeading==="number") h=e.webkitCompassHeading;
       else if(e.absolute&&typeof e.alpha==="number") h=(360-e.alpha)%360;
-      if(h!=null) ustawKierunek(h);
+      if(h!=null){ heading=h; pokazKompas(); }
     };
     window.addEventListener("deviceorientationabsolute",on,true);
     window.addEventListener("deviceorientation",on,true);
-    $("kompasBtn").hidden=true;
-    $("kompasTxt").textContent="Kompas włączony, obróć telefonem.";
   };
-  const D=window.DeviceOrientationEvent;
   if(D&&typeof D.requestPermission==="function"){
-    try{ (await D.requestPermission())==="granted" ? start()
-         : ($("kompasTxt").textContent="Brak zgody na dostęp do kompasu."); }
-    catch(e){ $("kompasTxt").textContent="Kompas niedostępny: "+e.message; }
-  } else if(D) start();
-  else $("kompasTxt").textContent="To urządzenie nie ma kompasu.";
-};
-
-/* ---------- głos ---------- */
-const Mowa=window.speechSynthesis;
-const Rozpoznawanie=window.SpeechRecognition||window.webkitSpeechRecognition;
-if(Rozpoznawanie) $("mic").hidden=false;
-$("mic").onclick=()=>{
-  const r=new Rozpoznawanie();
-  r.lang="pl-PL"; r.interimResults=false; r.maxAlternatives=1;
-  $("mic").textContent="Słucham…"; $("mic").disabled=true;
-  r.onresult=e=>{ $("addr").value=e.results[0][0].transcript; findAddr(); };
-  r.onerror=e=>setStatus("Nie rozpoznano mowy: "+e.error,"err");
-  r.onend=()=>{ $("mic").textContent="Dyktuj"; $("mic").disabled=false; };
-  r.start();
-};
-function powiedz(tekst){
-  if(!Mowa) return setStatus("Ta przeglądarka nie czyta na głos.","err");
-  Mowa.cancel();
-  const u=new SpeechSynthesisUtterance(tekst);
-  u.lang="pl-PL"; u.rate=1.0;
-  u.onend=()=>{ $("stop").hidden=true; };
-  $("stop").hidden=false;
-  Mowa.speak(u);
-}
-$("stop").onclick=()=>{ Mowa.cancel(); $("stop").hidden=true; };
-$("czytaj").onclick=()=>{ if(ostatni) powiedz(tekstDoOdczytu(ostatni.grupy)); };
-
-function tekstDoOdczytu(grupy){
-  const cz=["W promieniu "+radius+" metrów."];
-  for(const s of SEKCJE){
-    const lista=grupy[s.id]; if(!lista||!lista.length) continue;
-    cz.push(s.label+": "+lista.length+".");
-    lista.slice(0,5).forEach(it=>{
-      const k=wzgledem(it.az)||("na "+strona(it.az));
-      cz.push((it.nazwa||it.opis)+", "+it.d+" metrów, "+k+".");
-    });
-  }
-  if(cz.length===1) cz.push("Nic nie znaleziono.");
-  return cz.join(" ");
+    try{ if(await D.requestPermission()==="granted") sluchaj(); }catch(e){}
+  } else if(D) sluchaj();
+  pokazKompas();
 }
 
-/* ---------- wyszukiwanie adresu ---------- */
-async function findAddr(){
-  const q=$("addr").value.trim();
-  if(q.length<3) return setStatus("Wpisz co najmniej 3 znaki.","err");
-  setStatus("Szukam adresu…"); $("sugg").innerHTML="";
-  try{
-    const r=await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5"+
-      "&countrycodes=pl&addressdetails=1&q="+encodeURIComponent(q));
-    const d=await r.json();
-    if(!d.length) return setStatus("Nie znaleziono takiego adresu.","err");
-    setStatus("");
-    d.forEach(x=>{
-      const li=document.createElement("li");
-      const b=document.createElement("button");
-      b.type="button"; b.textContent=x.display_name;
-      b.onclick=()=>{ setPoint(x.lat,x.lon,x.display_name.split(",").slice(0,2).join(",")); $("sugg").innerHTML=""; };
-      li.appendChild(b); $("sugg").appendChild(li);
-    });
-  }catch(e){ setStatus("Wyszukiwarka adresów nie odpowiada: "+e.message,"err"); }
-}
-$("find").onclick=findAddr;
-$("addr").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); findAddr(); }});
-
-/* ---------- Overpass ---------- */
+/* ================= DANE ================= */
 function buildQL(lat,lon,r){
   const a="(around:"+r+","+lat+","+lon+")";
-  const klucze=["building",'"addr:housenumber"',"amenity","shop","office","craft",
-    "tourism","leisure","healthcare","highway","railway","landuse","natural",
-    "waterway","power","man_made","barrier","aeroway"];
-  return "[out:json][timeout:20];(\n"+
+  const klucze=["highway","footway","crossing","barrier","kerb","entrance",
+    '"addr:housenumber"',"amenity","shop","office","public_transport","railway",
+    "building","man_made","tactile_paving"];
+  return "[out:json][timeout:25];(\n"+
     klucze.map(k=>"  nwr"+a+"["+k+"];").join("\n")+
-    "\n);\nout tags geom 900;";
+    "\n);\nout tags geom 1200;";
 }
 async function askOverpass(ql){
   const fails=[];
   for(let proba=1;proba<=2;proba++){
-    if(proba>1){ setStatus("Serwer był zajęty, ponawiam…"); await new Promise(s=>setTimeout(s,2500)); }
+    if(proba>1){ powiedz("Serwer zajęty, ponawiam."); await new Promise(s=>setTimeout(s,2500)); }
     const ac=new AbortController();
-    const tm=setTimeout(()=>ac.abort(),25000);
+    const tm=setTimeout(()=>ac.abort(),28000);
     try{
       const r=await fetch(HOST+"/api/interpreter",{method:"POST",signal:ac.signal,
         headers:{"Content-Type":"application/x-www-form-urlencoded"},
         body:"data="+encodeURIComponent(ql)});
-      if(!r.ok){
-        fails.push("próba "+proba+": HTTP "+r.status+
-          (r.status===504?" (serwer przeciążony)":r.status===429?" (limit zapytań)":""));
-        continue;
-      }
-      return {data:await r.json(), via: proba>1?"za drugim razem":null};
+      if(!r.ok){ fails.push("próba "+proba+": HTTP "+r.status); continue; }
+      return await r.json();
     }catch(e){
-      fails.push("próba "+proba+": "+(e.name==="AbortError"?"brak odpowiedzi w 25 s":e.message));
+      fails.push("próba "+proba+": "+(e.name==="AbortError"?"brak odpowiedzi":e.message));
     }finally{ clearTimeout(tm); }
   }
   const err=new Error("serwer nie odpowiedział"); err.fails=fails; throw err;
 }
-async function diagnose(){
-  let dociera=false,inny=false;
-  try{ await fetch(HOST+"/api/status",{mode:"no-cors",cache:"no-store"}); dociera=true; }catch(e){}
-  try{ inny=(await fetch("https://nominatim.openstreetmap.org/status.php?format=json")).ok; }catch(e){}
-  if(dociera&&inny)
-    return "Overpass odrzuca żądania z tej domeny ("+location.host+"). Przenieś stronę pod inny adres.";
-  if(dociera)
-    return "Serwer odpowiada, ale jest przeciążony albo przekroczyłeś limit zapytań. Odczekaj minutę.";
-  return "Żądania nie docierają do serwera. Sprawdź połączenie albo blokady w przeglądarce.";
+async function dajDane(force){
+  const teraz=Date.now();
+  if(!force&&cache&&dist(cache.lat,cache.lon,pt.lat,pt.lon)<ODSWIEZ_PO) return cache.elements;
+  if(!force&&teraz-ostatniPobor<30000&&cache) return cache.elements;
+  ostatniPobor=teraz;
+  const d=await askOverpass(buildQL(pt.lat,pt.lon,CACHE_R));
+  cache={lat:pt.lat, lon:pt.lon, elements:d.elements||[]};
+  return cache.elements;
 }
 
-$("go").onclick=async()=>{
-  if(!pt) return;
-  $("go").disabled=true; $("czytaj").disabled=true; $("hits").style.display="none";
-  setStatus("Pytam OpenStreetMap…");
-  try{
-    const {data,via}=await askOverpass(buildQL(pt.lat,pt.lon,radius));
-    const grupy=zbierz(data.elements||[]);
-    ostatni={grupy,via};
-    rysuj(grupy,via);
-  }catch(e){
-    setStatus("Łączę się z diagnostyką…");
-    setStatus(await diagnose()+"\n\nSzczegóły:\n"+(e.fails||[e.message]).join("\n"),"err");
-  }finally{ $("go").disabled=false; }
-};
-
-/* ---------- przetwarzanie i widok ---------- */
-function zbierz(els){
+function zbierz(els,skad,zasieg){
   const kosze={}; SEKCJE.forEach(s=>kosze[s.id]=new Map());
   for(const el of els){
     const t=el.tags||{}; if(!Object.keys(t).length) continue;
     const hit=rozpoznaj(t); if(!hit) continue;
-    const np=najblizszy(el); if(!np||np.d>radius+15) continue;
+    const np=najblizszy(el,skad); if(!np||np.d>zasieg) continue;
     const nazwa=etykieta(t);
-    const klucz=nazwa ? hit.kat+"|"+nazwa
-                      : hit.kat+"|"+hit.opis+"|"+np.la.toFixed(5)+","+np.lo.toFixed(5);
+    const klucz=nazwa?hit.kat+"|"+nazwa
+                     :hit.kat+"|"+hit.opis+"|"+np.la.toFixed(5)+","+np.lo.toFixed(5);
     const prev=kosze[hit.kat].get(klucz);
     if(!prev||np.d<prev.d)
-      kosze[hit.kat].set(klucz,{nazwa, opis:hit.opis, d:np.d, la:np.la, lo:np.lo,
-        az:azymut(pt.lat,pt.lon,np.la,np.lo)});
+      kosze[hit.kat].set(klucz,{id:klucz, nazwa, opis:hit.opis, d:np.d, la:np.la, lo:np.lo,
+        az:azymut(skad.lat,skad.lon,np.la,np.lo)});
   }
   const grupy={};
   SEKCJE.forEach(s=>grupy[s.id]=[...kosze[s.id].values()].sort((a,b)=>a.d-b.d));
   return grupy;
 }
 
-function rysuj(grupy,via,tylkoKierunki){
+/* ================= SKAN ================= */
+$("skanuj").onclick=async()=>{
+  if(!pt) return powiedz("Najpierw muszę ustalić pozycję.",{przerwij:true});
+  $("skanuj").disabled=true;
+  powiedz("Skanuję otoczenie.",{przerwij:true});
+  try{
+    const els=await dajDane(false);
+    const grupy=zbierz(els,pt,ZASIEG);
+    ostatniSkan=grupy;
+    rysuj(grupy);
+    powiedz(opisSkanu(grupy));
+  }catch(e){
+    const m="Nie udało się pobrać danych. "+(e.fails?e.fails.join(". "):e.message);
+    setStatus(m,"err"); powiedz(m);
+  }finally{ $("skanuj").disabled=false; }
+};
+$("powtorz").onclick=()=>{
+  if(!ostatniSkan) return powiedz("Nie ma czego powtórzyć. Najpierw zeskanuj otoczenie.",{przerwij:true});
+  powiedz(opisSkanu(ostatniSkan),{przerwij:true});
+};
+
+function opisSkanu(grupy){
+  const cz=[];
+  let ile=0; SEKCJE.forEach(s=>ile+=grupy[s.id].length);
+  if(!ile) return "W promieniu "+ZASIEG+" metrów mapa nic nie zna. To nie znaczy, że wokół nic nie ma.";
+  cz.push("W promieniu "+ZASIEG+" metrów: "+ile+" obiektów.");
+  for(const s of SEKCJE){
+    const l=grupy[s.id]; if(!l.length) continue;
+    cz.push(s.label+", "+l.length+".");
+    l.slice(0,4).forEach(it=>
+      cz.push((it.nazwa?it.nazwa+", "+it.opis:it.opis)+", "+it.d+" metrów, "+kierunekSlownie(it.az)+"."));
+  }
+  if(heading==null) cz.push("Kompas nieaktywny, kierunki podaję jako strony świata.");
+  return cz.join(" ");
+}
+
+/* ================= TRYB MARSZU ================= */
+$("marsz").onclick=()=>{
+  if(watchId!=null){ zatrzymajMarsz(); return; }
+  if(!navigator.geolocation) return powiedz("Brak dostępu do lokalizacji.");
+  zapowiedziane=new Set();
+  $("marsz").textContent="Zakończ marsz";
+  powiedz("Tryb marszu włączony. Ostrzegam o przejściach i przeszkodach bliżej niż "+ZASIEG+" metrów.",{przerwij:true});
+  watchId=navigator.geolocation.watchPosition(wKroku,
+    e=>powiedz("Utracono pozycję. "+e.message),
+    {enableHighAccuracy:true,maximumAge:3000,timeout:20000});
+};
+function zatrzymajMarsz(){
+  if(watchId!=null) navigator.geolocation.clearWatch(watchId);
+  watchId=null;
+  $("marsz").textContent="Tryb marszu";
+  powiedz("Tryb marszu wyłączony.",{przerwij:true});
+}
+async function wKroku(p){
+  ustawPozycje(p.coords.latitude,p.coords.longitude,p.coords.accuracy);
+  if(typeof p.coords.heading==="number"&&!isNaN(p.coords.heading)&&p.coords.speed>0.6){
+    heading=p.coords.heading; pokazKompas();
+  }
+  pokazGdzie("W ruchu", p.coords.accuracy);
+  if(cel) zapowiedzCel();
+  let els;
+  try{ els=await dajDane(false); }catch(e){ return; }
+  const grupy=zbierz(els,pt,ZASIEG);
+  ostatniSkan=grupy; rysuj(grupy);
+
+  const teraz=Date.now();
+  if(teraz-ostatniaZapowiedz<6000) return;
+  for(const kat of PILNE){
+    const kand=grupy[kat].filter(it=>it.d<=ZASIEG&&!zapowiedziane.has(it.id));
+    if(!kand.length) continue;
+    const it=kand[0];
+    zapowiedziane.add(it.id);
+    ostatniaZapowiedz=teraz;
+    wibruj(it.d<25?[120,60,120]:80);
+    powiedz((it.nazwa?it.nazwa+", ":"")+it.opis+", "+it.d+" metrów, "+kierunekSlownie(it.az)+".");
+    return;
+  }
+}
+
+/* ================= PROWADZENIE DO CELU ================= */
+function ustawCel(it){
+  cel={la:it.la, lo:it.lo, nazwa:it.nazwa||it.opis};
+  $("celTxt").textContent="Cel: "+cel.nazwa;
+  $("celStop").hidden=false;
+  powiedz("Cel ustawiony: "+cel.nazwa+".",{przerwij:true});
+  zapowiedzCel();
+}
+$("celStop").onclick=()=>{
+  cel=null; $("celTxt").textContent="Nie wybrano celu.";
+  $("celStop").hidden=true; powiedz("Prowadzenie zakończone.",{przerwij:true});
+};
+function zapowiedzCel(){
+  if(!cel||!pt) return;
+  const d=dist(pt.lat,pt.lon,cel.la,cel.lo);
+  const az=azymut(pt.lat,pt.lon,cel.la,cel.lo);
+  $("celTxt").textContent="Cel: "+cel.nazwa+" — "+d+" m, "+kierunekSlownie(az);
+  if(d<=8){ powiedz("Jesteś przy celu: "+cel.nazwa+".",{przerwij:true}); wibruj([200,80,200]); cel=null;
+    $("celStop").hidden=true; return; }
+  const teraz=Date.now();
+  if(teraz-ostatniaZapowiedz<5000) return;
+  ostatniaZapowiedz=teraz;
+  powiedz("Cel "+d+" metrów, "+kierunekSlownie(az)+".");
+}
+
+/* ================= ADRES ================= */
+async function findAddr(){
+  const q=$("addr").value.trim();
+  if(q.length<3) return powiedz("Wpisz co najmniej trzy znaki.");
+  powiedz("Szukam adresu.");
+  $("sugg").innerHTML="";
+  try{
+    const r=await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5"+
+      "&countrycodes=pl&q="+encodeURIComponent(q));
+    const d=await r.json();
+    if(!d.length) return powiedz("Nie znaleziono takiego adresu.");
+    powiedz("Znaleziono "+d.length+". Wybierz z listy.");
+    d.forEach(x=>{
+      const li=document.createElement("li");
+      const b=document.createElement("button");
+      b.type="button"; b.textContent=x.display_name;
+      b.onclick=()=>{
+        ustawCel({la:+x.lat, lo:+x.lon, nazwa:x.display_name.split(",")[0]});
+        $("sugg").innerHTML="";
+      };
+      li.appendChild(b); $("sugg").appendChild(li);
+    });
+  }catch(e){ powiedz("Wyszukiwarka adresów nie odpowiada."); }
+}
+$("find").onclick=findAddr;
+$("addr").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); findAddr(); }});
+
+const Rozp=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(Rozp) $("mic").hidden=false;
+$("mic").onclick=()=>{
+  const r=new Rozp(); r.lang="pl-PL"; r.interimResults=false;
+  $("mic").textContent="Słucham…"; $("mic").disabled=true;
+  powiedz("Mów adres.",{przerwij:true});
+  r.onresult=e=>{ $("addr").value=e.results[0][0].transcript; findAddr(); };
+  r.onerror=()=>powiedz("Nie rozpoznano.");
+  r.onend=()=>{ $("mic").textContent="Dyktuj"; $("mic").disabled=false; };
+  r.start();
+};
+
+/* ================= WIDOK ================= */
+function setStatus(msg,kind){
+  const s=$("status");
+  if(!msg){ s.style.display="none"; return; }
+  s.textContent=msg; s.className="status"+(kind?" "+kind:""); s.style.display="block";
+}
+function rysuj(grupy){
   const box=$("hits"); box.innerHTML=""; let total=0;
   for(const s of SEKCJE){
     const lista=grupy[s.id]; if(!lista.length) continue;
@@ -491,41 +597,34 @@ function rysuj(grupy,via,tylkoKierunki){
     const sec=document.createElement("section");
     sec.className="sect"+(s.alarm?" alarm":"");
     const h=document.createElement("div"); h.className="shead";
-    h.innerHTML="<span>"+s.label+'</span><span class="count">'+lista.length+
-      " · najbliżej "+fmt(lista[0].d)+"</span>";
+    h.innerHTML="<h2>"+s.label+'</h2><span class="count">'+lista.length+" · "+lista[0].d+" m</span>";
     sec.appendChild(h);
-    lista.slice(0,20).forEach(it=>{
+    lista.slice(0,15).forEach(it=>{
       const row=document.createElement("div"); row.className="item";
       const nm=document.createElement("div"); nm.className="nm";
       nm.innerHTML="<span>"+esc(it.nazwa||it.opis)+"</span>"+
         (it.nazwa?'<span class="kind">'+esc(it.opis)+"</span>":"");
-      const dd=document.createElement("span");
-      dd.className="dist"+(s.alarm&&it.d<=(s.near||0)?" near":"");
-      dd.innerHTML=fmt(it.d)+"<small>"+(wzgledem(it.az)||strona(it.az))+"</small>";
-      const a=document.createElement("a"); a.className="map"; a.target="_blank";
-      a.rel="noopener"; a.textContent="mapa";
-      a.href="https://www.openstreetmap.org/?mlat="+it.la+"&mlon="+it.lo+"#map=19/"+it.la+"/"+it.lo;
-      row.append(nm,dd,a); sec.appendChild(row);
+      const dd=document.createElement("span"); dd.className="dist";
+      dd.innerHTML=it.d+" m<small>"+esc(kierunekSlownie(it.az))+"</small>";
+      const b=document.createElement("button");
+      b.type="button"; b.className="ghost"; b.textContent="Prowadź";
+      b.onclick=()=>ustawCel(it);
+      row.append(nm,dd,b); sec.appendChild(row);
     });
-    if(lista.length>20){
+    if(lista.length>15){
       const n=document.createElement("div"); n.className="note";
-      n.textContent="…i jeszcze "+(lista.length-20)+" dalej.";
+      n.textContent="…i jeszcze "+(lista.length-15)+" dalej.";
       sec.appendChild(n);
     }
     box.appendChild(sec);
   }
-  box.style.display= total?"flex":"none";
-  $("czytaj").disabled=!total;
-  if(tylkoKierunki) return;
-  if(!total) return setStatus("W promieniu "+fmt(radius)+
-    " nic nie oznaczono w OpenStreetMap. Przy tak małym zasięgu to częste.","err");
-  const al=grupy[UCIAZLIWE].length;
-  setStatus("Znaleziono "+total+" obiektów"+(al?", w tym "+al+" uciążliwych":
-    ". Żadnych uciążliwości")+(via?"  ·  "+via:""), al?null:"ok");
+  box.style.display=total?"flex":"none";
+  setStatus(total?("Znaleziono "+total+" obiektów w promieniu "+ZASIEG+" m."):
+    ("W promieniu "+ZASIEG+" m mapa nic nie zna."), total?null:"err");
 }
-
 function esc(s){ return String(s).replace(/[<>&"]/g,
   c=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c])); }
+$("skanuj").disabled=true;
 </script>
 </body>
 </html>
