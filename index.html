@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&display=swap">
 <style>
-/* Układ: jedna kolumna pod kciuk — lokalizacja, promień, wynik posortowany wg wagi */
+/* Układ: jedna kolumna pod kciuk — pozycja, promień, wynik wg wagi dla działki */
 :root{
   --bg:#f5f4f0; --surface:#fff; --fg:#1b1a17; --muted:#6e6a62; --line:#e0ddd5;
   --accent:#8a5a2b; --accent-soft:rgba(138,90,43,.1);
@@ -38,8 +38,7 @@
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);
-  padding-block:20px 56px;padding-left:16px;padding-right:16px;
-  -webkit-text-size-adjust:100%}
+  padding-block:20px 60px;padding-left:16px;padding-right:16px;-webkit-text-size-adjust:100%}
 .wrap{max-width:620px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
 h1{font-family:var(--display);font-size:25px;font-weight:700;margin:0;letter-spacing:-.02em}
 .tag{font-size:13px;color:var(--muted);margin:2px 0 6px}
@@ -50,44 +49,51 @@ input{width:100%;font:inherit;padding:11px 12px;border:1px solid var(--line);
   border-radius:9px;background:var(--bg);color:var(--fg)}
 input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 button{font:inherit;font-weight:600;border-radius:9px;cursor:pointer;
-  border:1px solid var(--accent);background:var(--accent);color:#fff;padding:12px 16px}
+  border:1px solid var(--accent);background:var(--accent);color:#fff;padding:11px 15px}
 button.ghost{background:transparent;color:var(--accent)}
 button:disabled{opacity:.45;cursor:default}
-.row{display:flex;gap:8px;flex-wrap:wrap}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .row>*{flex:1 1 auto;min-width:0}
-.big{width:100%;padding:14px;font-size:17px;margin-top:4px}
+.big{width:100%;padding:14px;font-size:17px;margin-top:10px}
 .chips{display:flex;gap:7px;flex-wrap:wrap}
 .chip{flex:0 0 auto;padding:9px 15px;border-radius:999px;border:1px solid var(--line);
   background:transparent;color:var(--fg);font-size:14px;font-weight:600}
 .chip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
-.coords{font-family:var(--mono);font-size:13px;color:var(--muted);
-  margin-top:10px;font-variant-numeric:tabular-nums}
+.gdzie{margin-top:11px;font-size:14px;line-height:1.45}
+.gdzie b{font-family:var(--display)}
+.coords{font-family:var(--mono);font-size:12.5px;color:var(--muted);
+  font-variant-numeric:tabular-nums;display:block;margin-top:2px}
+.kompas{display:flex;align-items:center;gap:10px;margin-top:11px;font-size:14px;color:var(--muted)}
+.igla{width:34px;height:34px;flex:0 0 auto;border:1px solid var(--line);border-radius:50%;
+  position:relative;background:var(--bg)}
+.igla::after{content:"";position:absolute;left:50%;top:5px;width:2px;height:13px;
+  background:var(--alarm);transform-origin:50% 100%;translate:-50% 0}
+.igla[data-off="1"]{opacity:.3}
 .hits{display:none;flex-direction:column;gap:12px}
 .sect{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.sect.alarm{border-color:var(--alarm);border-width:1px}
-.shead{display:flex;align-items:center;gap:9px;padding:13px 15px;
-  font-family:var(--display);font-weight:600;font-size:16px;
-  background:transparent;border:0;width:100%;text-align:left;color:var(--fg)}
+.sect.alarm{border-color:var(--alarm)}
+.shead{display:flex;align-items:baseline;gap:9px;padding:13px 15px;
+  font-family:var(--display);font-weight:600;font-size:16px}
 .sect.alarm .shead{background:var(--alarm-soft)}
-.count{margin-left:auto;font-family:var(--mono);font-size:13px;color:var(--muted);
+.count{margin-left:auto;font-family:var(--mono);font-size:12.5px;color:var(--muted);
   font-variant-numeric:tabular-nums;font-weight:400}
-.item{display:flex;gap:11px;align-items:baseline;padding:10px 15px;
+.item{display:flex;gap:10px;align-items:baseline;padding:10px 15px;
   border-top:1px solid var(--line);font-size:15px}
 .item .nm{flex:1 1 auto;min-width:0}
 .item .kind{display:block;font-size:12.5px;color:var(--muted);margin-top:1px}
 .dist{flex:0 0 auto;font-family:var(--mono);font-size:13.5px;
-  font-variant-numeric:tabular-nums;color:var(--muted)}
+  font-variant-numeric:tabular-nums;color:var(--muted);text-align:right}
 .dist.near{color:var(--alarm);font-weight:600}
+.dist small{display:block;font-family:var(--body);font-size:11.5px;font-weight:400}
 a.map{flex:0 0 auto;color:var(--accent);text-decoration:none;font-size:13px;font-weight:600}
 .note{font-size:13.5px;color:var(--muted);padding:11px 15px;border-top:1px solid var(--line)}
 .status{font-size:14px;padding:12px 14px;border-radius:9px;background:var(--accent-soft);
-  color:var(--accent);font-weight:600;display:none}
+  color:var(--accent);font-weight:600;display:none;white-space:pre-line}
 .status.err{background:var(--alarm-soft);color:var(--alarm)}
 .status.ok{background:var(--good-soft);color:var(--good)}
 .sugg{list-style:none;margin:9px 0 0;padding:0;display:flex;flex-direction:column;gap:5px}
 .sugg button{width:100%;text-align:left;background:transparent;color:var(--fg);
   border:1px solid var(--line);font-weight:400;font-size:14px;padding:10px 12px}
-@media (prefers-reduced-motion:no-preference){.sect{transition:border-color .15s}}
 </style>
 </head>
 <body>
@@ -95,8 +101,8 @@ a.map{flex:0 0 auto;color:var(--accent);text-decoration:none;font-size:13px;font
 
   <header>
     <h1>Otoczenie</h1>
-    <p class="tag">Co stoi w najbliższym sąsiedztwie punktu, do 100 m. Odległość liczona
-      do najbliższego punktu obiektu. Dane: OpenStreetMap.</p>
+    <p class="tag">Wszystko, co mapa zna w promieniu do 100 m — budynki, numery, firmy, teren.
+      Odległość i kierunek do najbliższego punktu obiektu.</p>
   </header>
 
   <div class="card">
@@ -104,34 +110,43 @@ a.map{flex:0 0 auto;color:var(--accent);text-decoration:none;font-size:13px;font
     <input id="addr" type="search" placeholder="np. Grodzisk Mazowiecki, Ogrodowa 12"
            autocomplete="off" enterkeyhint="search">
     <ul class="sugg" id="sugg"></ul>
-    <div class="row" style="margin-top:10px">
-      <button class="ghost" id="find" type="button">Szukaj adresu</button>
+    <div class="row">
+      <button class="ghost" id="find" type="button">Szukaj</button>
+      <button class="ghost" id="mic" type="button" hidden>Dyktuj</button>
       <button class="ghost" id="gps" type="button">Moja pozycja</button>
     </div>
-    <div class="coords" id="coords">Nie wybrano punktu.</div>
+    <div class="gdzie" id="gdzie">Nie wybrano punktu.</div>
+    <div class="kompas">
+      <span class="igla" id="igla" data-off="1"></span>
+      <span id="kompasTxt">Kompas wyłączony.</span>
+      <button class="ghost" id="kompasBtn" type="button" style="flex:0 0 auto;padding:7px 12px">Włącz</button>
+    </div>
   </div>
 
   <div class="card">
     <label>Promień</label>
     <div class="chips" id="radii"></div>
     <button class="big" id="go" type="button" disabled>Sprawdź otoczenie</button>
+    <div class="row">
+      <button class="ghost" id="czytaj" type="button" disabled>Czytaj na głos</button>
+      <button class="ghost" id="stop" type="button" hidden>Zatrzymaj</button>
+    </div>
   </div>
 
   <div class="status" id="status"></div>
   <div class="hits" id="hits"></div>
 
 </div>
-
 <script>
 "use strict";
-const HOST = "https://overpass-api.de";
-const $ = id => document.getElementById(id);
-let pt = null, radius = 50;
+const HOST="https://overpass-api.de";
+const $=id=>document.getElementById(id);
+let pt=null, radius=100, heading=null, ostatni=null;
 
-/* --- promienie --- */
+/* ---------- promienie ---------- */
 [25,50,75,100].forEach(r=>{
   const b=document.createElement("button");
-  b.type="button"; b.className="chip"; b.textContent = r+" m";
+  b.type="button"; b.className="chip"; b.textContent=r+" m";
   b.setAttribute("aria-pressed", String(r===radius));
   b.onclick=()=>{ radius=r;
     [...$("radii").children].forEach(c=>c.setAttribute("aria-pressed","false"));
@@ -139,122 +154,242 @@ let pt = null, radius = 50;
   $("radii").appendChild(b);
 });
 
-/* --- kategorie: kolejność = waga dla oceny działki --- */
-const CATS = [
-  {id:"uciazliwe", label:"Uciążliwości", alarm:true, near:50, tests:[
-    [t=>/^(motorway|trunk|primary)$/.test(t.highway||""), "droga o dużym ruchu"],
-    [t=>t.railway==="rail", "linia kolejowa"],
-    [t=>t.landuse==="industrial"||t.man_made==="works", "teren przemysłowy"],
-    [t=>t.man_made==="wastewater_plant", "oczyszczalnia ścieków"],
-    [t=>t.landuse==="landfill"||t.amenity==="waste_transfer_station", "składowisko odpadów"],
-    [t=>t.power==="substation"||t.power==="line", "infrastruktura energetyczna"],
-    [t=>t.man_made==="mast"||t.man_made==="tower", "maszt / wieża"],
-    [t=>!!t.aeroway, "lotnisko"],
-    [t=>t.landuse==="farmyard"||t.building==="farm_auxiliary", "zabudowa gospodarcza"]
-  ]},
-  {id:"transport", label:"Transport", tests:[
-    [t=>t.highway==="bus_stop", "przystanek autobusowy"],
-    [t=>t.railway==="station"||t.railway==="halt", "stacja kolejowa"],
-    [t=>t.amenity==="fuel", "stacja paliw"]
-  ]},
-  {id:"edukacja", label:"Szkoły i przedszkola", tests:[
-    [t=>t.amenity==="school", "szkoła"],
-    [t=>t.amenity==="kindergarten", "przedszkole"]
-  ]},
-  {id:"zdrowie", label:"Zdrowie", tests:[
-    [t=>t.amenity==="pharmacy", "apteka"],
-    [t=>t.amenity==="doctors"||t.amenity==="clinic", "przychodnia"],
-    [t=>t.amenity==="hospital", "szpital"]
-  ]},
-  {id:"sklepy", label:"Sklepy i usługi", tests:[
-    [t=>t.shop==="supermarket", "supermarket"],
-    [t=>!!t.shop, "sklep"],
-    [t=>t.amenity==="bank"||t.amenity==="atm", "bank / bankomat"],
-    [t=>t.amenity==="post_office", "poczta"],
-    [t=>t.amenity==="restaurant"||t.amenity==="cafe", "gastronomia"]
-  ]},
-  {id:"rekreacja", label:"Zieleń i rekreacja", tests:[
-    [t=>t.leisure==="park"||t.leisure==="garden", "park"],
-    [t=>t.leisure==="playground", "plac zabaw"],
-    [t=>t.leisure==="pitch"||t.leisure==="sports_centre", "obiekt sportowy"],
-    [t=>t.natural==="water"||t.waterway==="river", "woda"]
-  ]}
+/* ---------- słownik rodzajów ----------
+   Kolejność decyduje o przypisaniu: pierwszy pasujący wpis wygrywa. */
+const UCIAZLIWE="uciazliwe", FIRMY="firmy", BUDYNKI="budynki", TEREN="teren";
+const WPISY=[
+  [t=>/^(motorway|trunk|primary)$/.test(t.highway||""), UCIAZLIWE, "droga o dużym ruchu"],
+  [t=>t.railway==="rail", UCIAZLIWE, "linia kolejowa"],
+  [t=>t.landuse==="industrial"||t.man_made==="works", UCIAZLIWE, "teren przemysłowy"],
+  [t=>t.man_made==="wastewater_plant", UCIAZLIWE, "oczyszczalnia ścieków"],
+  [t=>t.landuse==="landfill"||t.amenity==="waste_transfer_station", UCIAZLIWE, "składowisko odpadów"],
+  [t=>t.power==="substation", UCIAZLIWE, "stacja transformatorowa"],
+  [t=>t.power==="line"||t.power==="minor_line", UCIAZLIWE, "linia energetyczna"],
+  [t=>/^(mast|communications_tower)$/.test(t.man_made||""), UCIAZLIWE, "maszt"],
+  [t=>!!t.aeroway, UCIAZLIWE, "lotnisko"],
+
+  [t=>t.shop==="supermarket", FIRMY, "supermarket"],
+  [t=>!!t.shop, FIRMY, "sklep"],
+  [t=>!!t.office, FIRMY, "biuro"],
+  [t=>!!t.craft, FIRMY, "zakład rzemieślniczy"],
+  [t=>t.amenity==="pharmacy", FIRMY, "apteka"],
+  [t=>/^(doctors|clinic|dentist)$/.test(t.amenity||"")||!!t.healthcare, FIRMY, "przychodnia"],
+  [t=>t.amenity==="hospital", FIRMY, "szpital"],
+  [t=>t.amenity==="school", FIRMY, "szkoła"],
+  [t=>t.amenity==="kindergarten", FIRMY, "przedszkole"],
+  [t=>/^(restaurant|cafe|bar|fast_food|pub)$/.test(t.amenity||""), FIRMY, "gastronomia"],
+  [t=>t.amenity==="fuel", FIRMY, "stacja paliw"],
+  [t=>/^(bank|atm|post_office)$/.test(t.amenity||""), FIRMY, "bank lub poczta"],
+  [t=>/^(hotel|guest_house|motel)$/.test(t.tourism||""), FIRMY, "nocleg"],
+  [t=>!!t.amenity, FIRMY, "obiekt usługowy"],
+
+  [t=>!!t["addr:housenumber"], BUDYNKI, "adres"],
+  [t=>t.building==="house"||t.building==="detached", BUDYNKI, "dom"],
+  [t=>t.building==="apartments", BUDYNKI, "blok mieszkalny"],
+  [t=>t.building==="garage"||t.building==="garages", BUDYNKI, "garaż"],
+  [t=>!!t.building, BUDYNKI, "budynek"],
+
+  [t=>t.highway==="bus_stop", TEREN, "przystanek"],
+  [t=>/^(station|halt|tram_stop)$/.test(t.railway||""), TEREN, "stacja"],
+  [t=>!!t.highway, TEREN, "droga"],
+  [t=>!!t.railway, TEREN, "tory"],
+  [t=>t.leisure==="playground", TEREN, "plac zabaw"],
+  [t=>!!t.leisure, TEREN, "teren rekreacyjny"],
+  [t=>t.natural==="water"||!!t.waterway, TEREN, "woda"],
+  [t=>!!t.natural, TEREN, "teren naturalny"],
+  [t=>!!t.landuse, TEREN, "teren"],
+  [t=>!!t.barrier, TEREN, "ogrodzenie"],
+  [t=>!!t.man_made||!!t.power, TEREN, "obiekt techniczny"],
+  [t=>!!t.tourism, TEREN, "obiekt turystyczny"]
+];
+const SEKCJE=[
+  {id:UCIAZLIWE, label:"Uciążliwości", alarm:true, near:50},
+  {id:FIRMY,     label:"Firmy i usługi"},
+  {id:BUDYNKI,   label:"Budynki i adresy"},
+  {id:TEREN,     label:"Teren i infrastruktura"}
 ];
 
-function classify(tags){
-  for (const c of CATS)
-    for (const [test, kind] of c.tests)
-      if (test(tags)) return {cat:c, kind};
+function rozpoznaj(t){
+  for(const [gdy,kat,opis] of WPISY) if(gdy(t)) return {kat,opis};
   return null;
 }
+function etykieta(t){
+  if(t.name) return t.name;
+  const nr=t["addr:housenumber"], ul=t["addr:street"];
+  if(nr) return ul ? ul+" "+nr : "nr "+nr;
+  return t.operator||t.brand||null;
+}
 
+/* ---------- geometria ---------- */
 function dist(a,b,c,d){
-  const R=6371000, p=Math.PI/180;
-  const dla=(c-a)*p, dlo=(d-b)*p;
-  const h=Math.sin(dla/2)**2 + Math.cos(a*p)*Math.cos(c*p)*Math.sin(dlo/2)**2;
+  const R=6371000,p=Math.PI/180;
+  const dla=(c-a)*p,dlo=(d-b)*p;
+  const h=Math.sin(dla/2)**2+Math.cos(a*p)*Math.cos(c*p)*Math.sin(dlo/2)**2;
   return Math.round(2*R*Math.asin(Math.sqrt(h)));
 }
-const fmt = m => m+" m";
-
-/* Najbliższy punkt obiektu, nie jego środek. Dla drogi liczy się miejsce,
-   w którym mija działkę — środek jej geometrii bywa kilometry dalej. */
-function nearestPoint(el){
+function azymut(a,b,c,d){
+  const p=Math.PI/180;
+  const y=Math.sin((d-b)*p)*Math.cos(c*p);
+  const x=Math.cos(a*p)*Math.sin(c*p)-Math.sin(a*p)*Math.cos(c*p)*Math.cos((d-b)*p);
+  return (Math.atan2(y,x)/p+360)%360;
+}
+const STRONY=["północ","północny wschód","wschód","południowy wschód",
+              "południe","południowy zachód","zachód","północny zachód"];
+const strona=az=>STRONY[Math.round(az/45)%8];
+function wzgledem(az){
+  if(heading==null) return null;
+  const d=((az-heading)%360+360)%360;
+  if(d<23||d>=337) return "przed tobą";
+  if(d<68) return "przed tobą w prawo";
+  if(d<113) return "po prawej";
+  if(d<158) return "za tobą w prawo";
+  if(d<203) return "za tobą";
+  if(d<248) return "za tobą w lewo";
+  if(d<293) return "po lewej";
+  return "przed tobą w lewo";
+}
+function najblizszy(el){
   const pts=[];
   if(Array.isArray(el.geometry)) pts.push(...el.geometry);
-  if(Array.isArray(el.members))
-    el.members.forEach(m=>{ if(Array.isArray(m.geometry)) pts.push(...m.geometry); });
+  if(Array.isArray(el.members)) el.members.forEach(m=>{ if(Array.isArray(m.geometry)) pts.push(...m.geometry); });
   if(!pts.length){
-    const la=el.lat ?? el.center?.lat, lo=el.lon ?? el.center?.lon;
-    return (la==null||lo==null) ? null : {la, lo, d:dist(pt.lat,pt.lon,la,lo)};
+    const la=el.lat??el.center?.lat, lo=el.lon??el.center?.lon;
+    return (la==null||lo==null)?null:{la,lo,d:dist(pt.lat,pt.lon,la,lo)};
   }
   let best=null;
   for(const g of pts){
     if(g.lat==null) continue;
     const d=dist(pt.lat,pt.lon,g.lat,g.lon);
-    if(!best||d<best.d) best={la:g.lat, lo:g.lon, d};
+    if(!best||d<best.d) best={la:g.lat,lo:g.lon,d};
   }
   return best;
 }
-
-function setStatus(msg, kind){
+const fmt=m=>m+" m";
+function setStatus(msg,kind){
   const s=$("status");
   if(!msg){ s.style.display="none"; return; }
   s.textContent=msg; s.className="status"+(kind?" "+kind:""); s.style.display="block";
 }
 
-function setPoint(lat, lon, label){
-  pt={lat:+lat, lon:+lon};
-  $("coords").textContent = (label ? label+" · " : "") +
-    pt.lat.toFixed(5)+", "+pt.lon.toFixed(5);
+/* ---------- punkt i adres ---------- */
+async function setPoint(lat,lon,label){
+  pt={lat:+lat,lon:+lon};
+  $("gdzie").innerHTML="<b>"+(label?esc(label):"Wybrany punkt")+"</b>"+
+    '<span class="coords">'+pt.lat.toFixed(5)+", "+pt.lon.toFixed(5)+"</span>";
   $("go").disabled=false;
-  try{ localStorage.setItem("otoczenie:pt", JSON.stringify({...pt,label})); }catch(e){}
+  try{ localStorage.setItem("otoczenie:pt",JSON.stringify({...pt,label})); }catch(e){}
 }
-
+async function adresDlaPunktu(){
+  try{
+    const r=await fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18"+
+      "&addressdetails=1&lat="+pt.lat+"&lon="+pt.lon);
+    const a=(await r.json()).address||{};
+    const ul=a.road||a.pedestrian||a.footway||"";
+    const nr=a.house_number||"";
+    const m=a.city||a.town||a.village||a.municipality||"";
+    const linia=[ul&&nr?ul+" "+nr:ul, m].filter(Boolean).join(", ");
+    if(linia) $("gdzie").innerHTML="<b>"+esc(linia)+"</b>"+
+      (nr?"":' <span style="color:var(--muted);font-size:13px">(bez numeru w OSM)</span>')+
+      '<span class="coords">'+pt.lat.toFixed(5)+", "+pt.lon.toFixed(5)+"</span>";
+  }catch(e){}
+}
 try{
   const s=JSON.parse(localStorage.getItem("otoczenie:pt")||"null");
-  if(s && isFinite(s.lat)) setPoint(s.lat, s.lon, s.label);
+  if(s&&isFinite(s.lat)) setPoint(s.lat,s.lon,s.label);
 }catch(e){}
 
-/* --- GPS --- */
 $("gps").onclick=()=>{
   if(!navigator.geolocation) return setStatus("Przeglądarka nie udostępnia lokalizacji.","err");
   setStatus("Ustalam pozycję…");
   navigator.geolocation.getCurrentPosition(
-    p=>{ setPoint(p.coords.latitude, p.coords.longitude, "moja pozycja"); setStatus(""); },
+    async p=>{
+      await setPoint(p.coords.latitude,p.coords.longitude,"Moja pozycja");
+      setStatus("Pozycja z dokładnością "+Math.round(p.coords.accuracy)+" m. Szukam adresu…");
+      await adresDlaPunktu();
+      setStatus("");
+    },
     e=>setStatus("Nie udało się pobrać pozycji: "+e.message,"err"),
-    {enableHighAccuracy:true, timeout:15000, maximumAge:60000}
+    {enableHighAccuracy:true,timeout:15000,maximumAge:30000}
   );
 };
 
-/* --- wyszukiwanie adresu (Nominatim) --- */
+/* ---------- kompas ---------- */
+function ustawKierunek(h){
+  heading=h;
+  $("igla").dataset.off="0";
+  $("igla").style.setProperty("rotate", (-h)+"deg");
+  $("kompasTxt").textContent="Patrzysz na "+strona(h)+" ("+Math.round(h)+"°).";
+  if(ostatni) rysuj(ostatni.grupy,ostatni.via,true);
+}
+$("kompasBtn").onclick=async()=>{
+  const start=()=>{
+    const on=e=>{
+      let h=null;
+      if(typeof e.webkitCompassHeading==="number") h=e.webkitCompassHeading;
+      else if(e.absolute&&typeof e.alpha==="number") h=(360-e.alpha)%360;
+      if(h!=null) ustawKierunek(h);
+    };
+    window.addEventListener("deviceorientationabsolute",on,true);
+    window.addEventListener("deviceorientation",on,true);
+    $("kompasBtn").hidden=true;
+    $("kompasTxt").textContent="Kompas włączony, obróć telefonem.";
+  };
+  const D=window.DeviceOrientationEvent;
+  if(D&&typeof D.requestPermission==="function"){
+    try{ (await D.requestPermission())==="granted" ? start()
+         : ($("kompasTxt").textContent="Brak zgody na dostęp do kompasu."); }
+    catch(e){ $("kompasTxt").textContent="Kompas niedostępny: "+e.message; }
+  } else if(D) start();
+  else $("kompasTxt").textContent="To urządzenie nie ma kompasu.";
+};
+
+/* ---------- głos ---------- */
+const Mowa=window.speechSynthesis;
+const Rozpoznawanie=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(Rozpoznawanie) $("mic").hidden=false;
+$("mic").onclick=()=>{
+  const r=new Rozpoznawanie();
+  r.lang="pl-PL"; r.interimResults=false; r.maxAlternatives=1;
+  $("mic").textContent="Słucham…"; $("mic").disabled=true;
+  r.onresult=e=>{ $("addr").value=e.results[0][0].transcript; findAddr(); };
+  r.onerror=e=>setStatus("Nie rozpoznano mowy: "+e.error,"err");
+  r.onend=()=>{ $("mic").textContent="Dyktuj"; $("mic").disabled=false; };
+  r.start();
+};
+function powiedz(tekst){
+  if(!Mowa) return setStatus("Ta przeglądarka nie czyta na głos.","err");
+  Mowa.cancel();
+  const u=new SpeechSynthesisUtterance(tekst);
+  u.lang="pl-PL"; u.rate=1.0;
+  u.onend=()=>{ $("stop").hidden=true; };
+  $("stop").hidden=false;
+  Mowa.speak(u);
+}
+$("stop").onclick=()=>{ Mowa.cancel(); $("stop").hidden=true; };
+$("czytaj").onclick=()=>{ if(ostatni) powiedz(tekstDoOdczytu(ostatni.grupy)); };
+
+function tekstDoOdczytu(grupy){
+  const cz=["W promieniu "+radius+" metrów."];
+  for(const s of SEKCJE){
+    const lista=grupy[s.id]; if(!lista||!lista.length) continue;
+    cz.push(s.label+": "+lista.length+".");
+    lista.slice(0,5).forEach(it=>{
+      const k=wzgledem(it.az)||("na "+strona(it.az));
+      cz.push((it.nazwa||it.opis)+", "+it.d+" metrów, "+k+".");
+    });
+  }
+  if(cz.length===1) cz.push("Nic nie znaleziono.");
+  return cz.join(" ");
+}
+
+/* ---------- wyszukiwanie adresu ---------- */
 async function findAddr(){
   const q=$("addr").value.trim();
   if(q.length<3) return setStatus("Wpisz co najmniej 3 znaki.","err");
   setStatus("Szukam adresu…"); $("sugg").innerHTML="";
   try{
-    const u="https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5"+
-            "&countrycodes=pl&q="+encodeURIComponent(q);
-    const r=await fetch(u,{headers:{"Accept":"application/json"}});
+    const r=await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5"+
+      "&countrycodes=pl&addressdetails=1&q="+encodeURIComponent(q));
     const d=await r.json();
     if(!d.length) return setStatus("Nie znaleziono takiego adresu.","err");
     setStatus("");
@@ -262,7 +397,7 @@ async function findAddr(){
       const li=document.createElement("li");
       const b=document.createElement("button");
       b.type="button"; b.textContent=x.display_name;
-      b.onclick=()=>{ setPoint(x.lat, x.lon, x.name||q); $("sugg").innerHTML=""; };
+      b.onclick=()=>{ setPoint(x.lat,x.lon,x.display_name.split(",").slice(0,2).join(",")); $("sugg").innerHTML=""; };
       li.appendChild(b); $("sugg").appendChild(li);
     });
   }catch(e){ setStatus("Wyszukiwarka adresów nie odpowiada: "+e.message,"err"); }
@@ -270,33 +405,22 @@ async function findAddr(){
 $("find").onclick=findAddr;
 $("addr").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); findAddr(); }});
 
-/* --- zapytanie Overpass --- */
+/* ---------- Overpass ---------- */
 function buildQL(lat,lon,r){
   const a="(around:"+r+","+lat+","+lon+")";
-  const sel=['[amenity]','[shop]','[leisure]','[highway=bus_stop]','[railway~"^(rail|station|halt)$"]',
-    '[highway~"^(motorway|trunk|primary)$"]','[landuse~"^(industrial|landfill|farmyard)$"]',
-    '[man_made~"^(works|wastewater_plant|mast|tower)$"]','[power~"^(line|substation)$"]',
-    '[aeroway]','[natural=water]','[waterway=river]'];
-  return "[out:json][timeout:12];(\n"+
-    sel.map(s=>"  nwr"+a+s+";").join("\n")+
-    "\n);\nout tags geom 500;";
+  const klucze=["building",'"addr:housenumber"',"amenity","shop","office","craft",
+    "tourism","leisure","healthcare","highway","railway","landuse","natural",
+    "waterway","power","man_made","barrier","aeroway"];
+  return "[out:json][timeout:20];(\n"+
+    klucze.map(k=>"  nwr"+a+"["+k+"];").join("\n")+
+    "\n);\nout tags geom 900;";
 }
-
-/* Próbuje POST, potem GET, potem kolejny serwer. Blokady bywają wybiórcze —
-   część filtrów przepuszcza GET, a zatrzymuje POST. */
-/* Jedno żądanie na serwer, POST, krótki limit czasu. Overpass dopuszcza
-   kilka zapytań naraz na adres IP — zalewanie go próbami tylko nabija limit. */
-/* Overpass bywa chwilowo przeciążony i odpowiada 504 mniej więcej co trzecie
-   zapytanie. Dwa podejścia z przerwą wystarczają; więcej tylko nabija limit. */
 async function askOverpass(ql){
   const fails=[];
-  for(let proba=1; proba<=2; proba++){
-    if(proba>1){
-      setStatus("Serwer był zajęty, ponawiam…");
-      await new Promise(s=>setTimeout(s, 2500));
-    }
+  for(let proba=1;proba<=2;proba++){
+    if(proba>1){ setStatus("Serwer był zajęty, ponawiam…"); await new Promise(s=>setTimeout(s,2500)); }
     const ac=new AbortController();
-    const tm=setTimeout(()=>ac.abort(), 20000);
+    const tm=setTimeout(()=>ac.abort(),25000);
     try{
       const r=await fetch(HOST+"/api/interpreter",{method:"POST",signal:ac.signal,
         headers:{"Content-Type":"application/x-www-form-urlencoded"},
@@ -306,107 +430,98 @@ async function askOverpass(ql){
           (r.status===504?" (serwer przeciążony)":r.status===429?" (limit zapytań)":""));
         continue;
       }
-      return {data: await r.json(), via: proba>1 ? "za drugim razem" : null};
+      return {data:await r.json(), via: proba>1?"za drugim razem":null};
     }catch(e){
-      fails.push("próba "+proba+": "+(e.name==="AbortError"?"brak odpowiedzi w 20 s":e.message));
+      fails.push("próba "+proba+": "+(e.name==="AbortError"?"brak odpowiedzi w 25 s":e.message));
     }finally{ clearTimeout(tm); }
   }
   const err=new Error("serwer nie odpowiedział"); err.fails=fails; throw err;
 }
-
-/* Rozstrzyga, czy zawiodła sieć, czy nagłówki serwera. */
 async function diagnose(){
-  let dociera=false;
-  try{ await fetch("https://overpass-api.de/api/status",{mode:"no-cors",cache:"no-store"}); dociera=true; }catch(e){}
-  let inny=false;
-  try{ const n=await fetch("https://nominatim.openstreetmap.org/status.php?format=json"); inny=n.ok; }catch(e){}
-
-  if(dociera && inny)
-    return "Overpass odrzuca żądania z tej domeny ("+location.host+"), choć serwer odpowiada, "+
-           "a inne usługi OpenStreetMap z tej samej strony działają. Przenieś stronę pod inny adres "+
-           "— domena netlify.app jest odrzucana, github.io działa.";
+  let dociera=false,inny=false;
+  try{ await fetch(HOST+"/api/status",{mode:"no-cors",cache:"no-store"}); dociera=true; }catch(e){}
+  try{ inny=(await fetch("https://nominatim.openstreetmap.org/status.php?format=json")).ok; }catch(e){}
+  if(dociera&&inny)
+    return "Overpass odrzuca żądania z tej domeny ("+location.host+"). Przenieś stronę pod inny adres.";
   if(dociera)
-    return "Serwer odpowiada, ale odpowiedź przychodzi bez nagłówków CORS. Zwykle to przeciążenie "+
-           "albo przekroczony limit zapytań. Odczekaj kilka minut.";
-  return "Żądania nie docierają do serwera. Blokuje je sieć, prywatny DNS albo blokada treści "+
-         "w przeglądarce. Sprawdź na innym łączu lub w innej przeglądarce.";
+    return "Serwer odpowiada, ale jest przeciążony albo przekroczyłeś limit zapytań. Odczekaj minutę.";
+  return "Żądania nie docierają do serwera. Sprawdź połączenie albo blokady w przeglądarce.";
 }
 
 $("go").onclick=async()=>{
   if(!pt) return;
-  $("go").disabled=true; $("hits").style.display="none";
+  $("go").disabled=true; $("czytaj").disabled=true; $("hits").style.display="none";
   setStatus("Pytam OpenStreetMap…");
   try{
-    const {data, via} = await askOverpass(buildQL(pt.lat,pt.lon,radius));
-    render(data.elements||[], via);
+    const {data,via}=await askOverpass(buildQL(pt.lat,pt.lon,radius));
+    const grupy=zbierz(data.elements||[]);
+    ostatni={grupy,via};
+    rysuj(grupy,via);
   }catch(e){
     setStatus("Łączę się z diagnostyką…");
-    const verdict = await diagnose();
-    setStatus(verdict + "\n\nSzczegóły prób:\n" + (e.fails||[e.message]).join("\n"), "err");
-    $("status").style.whiteSpace="pre-line";
+    setStatus(await diagnose()+"\n\nSzczegóły:\n"+(e.fails||[e.message]).join("\n"),"err");
   }finally{ $("go").disabled=false; }
 };
 
-function render(els, via){
-  const buckets=new Map(); CATS.forEach(c=>buckets.set(c.id,new Map()));
+/* ---------- przetwarzanie i widok ---------- */
+function zbierz(els){
+  const kosze={}; SEKCJE.forEach(s=>kosze[s.id]=new Map());
   for(const el of els){
     const t=el.tags||{}; if(!Object.keys(t).length) continue;
-    const hit=classify(t); if(!hit) continue;
-    const np=nearestPoint(el); if(!np) continue;
-    if(np.d>radius+15) continue;
-    const name=t.name||t["addr:street"]||null;
-    const key=hit.cat.id+"|"+(name||hit.kind);
-    const prev=buckets.get(hit.cat.id).get(key);
+    const hit=rozpoznaj(t); if(!hit) continue;
+    const np=najblizszy(el); if(!np||np.d>radius+15) continue;
+    const nazwa=etykieta(t);
+    const klucz=nazwa ? hit.kat+"|"+nazwa
+                      : hit.kat+"|"+hit.opis+"|"+np.la.toFixed(5)+","+np.lo.toFixed(5);
+    const prev=kosze[hit.kat].get(klucz);
     if(!prev||np.d<prev.d)
-      buckets.get(hit.cat.id).set(key,{name, kind:hit.kind, d:np.d, la:np.la, lo:np.lo});
+      kosze[hit.kat].set(klucz,{nazwa, opis:hit.opis, d:np.d, la:np.la, lo:np.lo,
+        az:azymut(pt.lat,pt.lon,np.la,np.lo)});
   }
+  const grupy={};
+  SEKCJE.forEach(s=>grupy[s.id]=[...kosze[s.id].values()].sort((a,b)=>a.d-b.d));
+  return grupy;
+}
 
-  const box=$("hits"); box.innerHTML="";
-  let total=0;
-  for(const c of CATS){
-    const list=[...buckets.get(c.id).values()].sort((a,b)=>a.d-b.d);
-    if(!list.length) continue;
-    total+=list.length;
+function rysuj(grupy,via,tylkoKierunki){
+  const box=$("hits"); box.innerHTML=""; let total=0;
+  for(const s of SEKCJE){
+    const lista=grupy[s.id]; if(!lista.length) continue;
+    total+=lista.length;
     const sec=document.createElement("section");
-    sec.className="sect"+(c.alarm?" alarm":"");
-    const h=document.createElement("div");
-    h.className="shead";
-    h.innerHTML='<span>'+c.label+'</span><span class="count">'+list.length+
-      " · najbliżej "+fmt(list[0].d)+"</span>";
+    sec.className="sect"+(s.alarm?" alarm":"");
+    const h=document.createElement("div"); h.className="shead";
+    h.innerHTML="<span>"+s.label+'</span><span class="count">'+lista.length+
+      " · najbliżej "+fmt(lista[0].d)+"</span>";
     sec.appendChild(h);
-    list.slice(0,14).forEach(it=>{
+    lista.slice(0,20).forEach(it=>{
       const row=document.createElement("div"); row.className="item";
       const nm=document.createElement("div"); nm.className="nm";
-      nm.innerHTML="<span>"+esc(it.name||it.kind)+"</span>"+
-        (it.name?'<span class="kind">'+esc(it.kind)+"</span>":"");
+      nm.innerHTML="<span>"+esc(it.nazwa||it.opis)+"</span>"+
+        (it.nazwa?'<span class="kind">'+esc(it.opis)+"</span>":"");
       const dd=document.createElement("span");
-      dd.className="dist"+(c.alarm&&it.d<=(c.near||0)?" near":"");
-      dd.textContent=fmt(it.d);
+      dd.className="dist"+(s.alarm&&it.d<=(s.near||0)?" near":"");
+      dd.innerHTML=fmt(it.d)+"<small>"+(wzgledem(it.az)||strona(it.az))+"</small>";
       const a=document.createElement("a"); a.className="map"; a.target="_blank";
       a.rel="noopener"; a.textContent="mapa";
-      a.href="https://www.openstreetmap.org/?mlat="+it.la+"&mlon="+it.lo+"#map=18/"+it.la+"/"+it.lo;
+      a.href="https://www.openstreetmap.org/?mlat="+it.la+"&mlon="+it.lo+"#map=19/"+it.la+"/"+it.lo;
       row.append(nm,dd,a); sec.appendChild(row);
     });
-    if(list.length>14){
+    if(lista.length>20){
       const n=document.createElement("div"); n.className="note";
-      n.textContent="…i jeszcze "+(list.length-14)+" dalej.";
+      n.textContent="…i jeszcze "+(lista.length-20)+" dalej.";
       sec.appendChild(n);
     }
     box.appendChild(sec);
   }
-
-  if(!total){
-    setStatus("W promieniu "+fmt(radius)+" nic nie oznaczono w OpenStreetMap. "+
-      "Przy tak małym zasięgu to częste i nie znaczy, że wokół jest pusto.","err");
-    return;
-  }
-  const alarms=buckets.get("uciazliwe").size;
-  const src = via ? "  ·  "+via : "";
-  setStatus(alarms
-    ? "Znaleziono "+total+" obiektów, w tym "+alarms+" w kategorii uciążliwości."+src
-    : "Znaleziono "+total+" obiektów. Żadnych uciążliwości w tym promieniu."+src,
-    alarms?null:"ok");
-  box.style.display="flex";
+  box.style.display= total?"flex":"none";
+  $("czytaj").disabled=!total;
+  if(tylkoKierunki) return;
+  if(!total) return setStatus("W promieniu "+fmt(radius)+
+    " nic nie oznaczono w OpenStreetMap. Przy tak małym zasięgu to częste.","err");
+  const al=grupy[UCIAZLIWE].length;
+  setStatus("Znaleziono "+total+" obiektów"+(al?", w tym "+al+" uciążliwych":
+    ". Żadnych uciążliwości")+(via?"  ·  "+via:""), al?null:"ok");
 }
 
 function esc(s){ return String(s).replace(/[<>&"]/g,
