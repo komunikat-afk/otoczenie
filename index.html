@@ -125,6 +125,13 @@ input:focus-visible{outline:4px solid var(--accent);outline-offset:2px}
   </div>
 
   <div class="card">
+    <h2>Dane okolicy w telefonie</h2>
+    <p class="tag" id="daneTxt">Brak pobranych danych — każde skanowanie pyta serwer.</p>
+    <button class="ghost" id="pobierz" type="button">Pobierz dane okolicy</button>
+    <button class="ghost" id="usunDane" type="button" hidden style="margin-top:10px">Usuń pobrane dane</button>
+  </div>
+
+  <div class="card">
     <h2>Prowadzenie do celu</h2>
     <p class="tag" id="celTxt">Nie wybrano celu. Po skanowaniu naciśnij „Prowadź” przy obiekcie.</p>
     <button class="ghost" id="celStop" type="button" hidden>Zakończ prowadzenie</button>
@@ -153,7 +160,7 @@ const CACHE_R=150;     // metry pobierane z serwera za jednym razem
 const ODSWIEZ_PO=50;   // po tylu metrach marszu dociągamy nowe dane
 
 let pt=null, heading=null, tempo=1.0;
-let cache=null, ostatniSkan=null, cel=null;
+let ostatniSkan=null, cel=null;
 let watchId=null, zapowiedziane=new Set(), ostatniaZapowiedz=0, ostatniPobor=0;
 
 try{ const t=parseFloat(localStorage.getItem("otoczenie:tempo")); if(t>0.5&&t<3) tempo=t; }catch(e){}
@@ -173,6 +180,35 @@ const stopnie = n=>n+" "+odm(n,"stopień","stopnie","stopni");
 /* Godziny czyta się w miejscowniku: „na godzinie drugiej”, nie „dwa”. */
 const GODZINY=["","pierwszej","drugiej","trzeciej","czwartej","piątej","szóstej",
                "siódmej","ósmej","dziewiątej","dziesiątej","jedenastej","dwunastej"];
+
+/* Syntezator widzi „1 Maja 10” i rozpoznaje datę — czyta „dziesiątego roku”.
+   Nazwę ulicy zostawiam (》1 Maja《 ma brzmieć „pierwszego maja”),
+   a sam numer domu zamieniam na słowa, żeby nie było czego interpretować. */
+const _J=["zero","jeden","dwa","trzy","cztery","pięć","sześć","siedem","osiem","dziewięć"];
+const _N=["dziesięć","jedenaście","dwanaście","trzynaście","czternaście","piętnaście",
+          "szesnaście","siedemnaście","osiemnaście","dziewiętnaście"];
+const _D=["","","dwadzieścia","trzydzieści","czterdzieści","pięćdziesiąt",
+          "sześćdziesiąt","siedemdziesiąt","osiemdziesiąt","dziewięćdziesiąt"];
+const _S=["","sto","dwieście","trzysta","czterysta","pięćset",
+          "sześćset","siedemset","osiemset","dziewięćset"];
+function liczbaSlownie(n){
+  n=+n;
+  if(!isFinite(n)||n<0||n>999||!Number.isInteger(n)) return String(n);
+  if(n<10) return _J[n];
+  if(n<20) return _N[n-10];
+  const s=Math.floor(n/100), r=n%100, d=Math.floor(r/10), j=r%10, cz=[];
+  if(s) cz.push(_S[s]);
+  if(r>=10&&r<20) cz.push(_N[r-10]);
+  else { if(d) cz.push(_D[d]); if(j) cz.push(_J[j]); }
+  return cz.join(" ");
+}
+function numerSlownie(txt){
+  return String(txt)
+    .replace(/\//g," łamane przez ")
+    .replace(/(\d)([A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż])/g,"$1 $2")
+    .replace(/\d+/g, m=> m.length<=3 ? liczbaSlownie(m) : m)
+    .replace(/\s+/g," ").trim();
+}
 
 /* ============ MOWA ============ */
 const Synteza=window.speechSynthesis;
@@ -241,7 +277,18 @@ const kierunekMowa = az=>{ const g=godzina(az);
 const kierunekEkran = az=>{ const g=godzina(az);
   return g!=null ? "godz. "+g : strona(az); };
 
+/* Obsługuje dwa kształty: świeżą odpowiedź Overpassa oraz rekord
+   z pamięci telefonu ({t:tagi, p:[lat,lon]} albo {t:tagi, g:[[lat,lon],…]}). */
 function najblizszy(el,skad){
+  if(Array.isArray(el.g)){
+    let best=null;
+    for(const [la,lo] of el.g){
+      const d=dist(skad.lat,skad.lon,la,lo);
+      if(!best||d<best.d) best={la,lo,d};
+    }
+    return best;
+  }
+  if(Array.isArray(el.p)) return {la:el.p[0], lo:el.p[1], d:dist(skad.lat,skad.lon,el.p[0],el.p[1])};
   const pts=[];
   if(Array.isArray(el.geometry)) pts.push(...el.geometry);
   if(Array.isArray(el.members)) el.members.forEach(m=>{ if(Array.isArray(m.geometry)) pts.push(...m.geometry); });
@@ -350,11 +397,18 @@ function rozpoznaj(t){
     if(gdy(t)) return {kat, opis:opis(t), cichy:!!cichy};
   return null;
 }
+/* Zwraca osobno napis na ekran i napis do przeczytania. */
 function etykieta(t){
-  if(t.name) return t.name;
   const nr=t["addr:housenumber"], ul=t["addr:street"];
-  if(nr) return ul?ul+" "+nr:"numer "+nr;
-  return t.operator||t.brand||null;
+  if(t.name){
+    const e=t.name;
+    return {ekran:e, mowa: nr ? e+", numer "+numerSlownie(nr) : e};
+  }
+  if(nr) return ul
+    ? {ekran: ul+" "+nr, mowa: ul+", numer "+numerSlownie(nr)}
+    : {ekran: "nr "+nr,  mowa: "numer "+numerSlownie(nr)};
+  const o=t.operator||t.brand;
+  return o?{ekran:o, mowa:o}:null;
 }
 
 /* ============ POZYCJA ============ */
@@ -374,7 +428,8 @@ async function adresDlaPunktu(mow){
     const linia=[ul&&nr?ul+" "+nr:ul, m].filter(Boolean).join(", ");
     if(linia){
       pokazGdzie(linia, pt.acc);
-      if(mow) powiedz("Jesteś przy "+linia+(nr?"":", numeru brak w bazie")+".");
+      const mowiony=[ul?(nr?ul+", numer "+numerSlownie(nr):ul):"", m].filter(Boolean).join(", ");
+      if(mow) powiedz("Jesteś przy "+mowiony+(nr?"":", numeru brak w bazie")+".");
       return linia;
     }
   }catch(e){}
@@ -431,54 +486,187 @@ async function wlaczKompas(){
 /* ============ DANE ============
    Dwa zbiory: linie z pełną geometrią (do nich liczy się najbliższy punkt),
    reszta tylko ze środkiem. Pełna geometria budynków to megabajty bez pożytku. */
-function buildQL(lat,lon,r){
+/* Etap 1 — to, co decyduje o bezpieczeństwie. Same węzły plus schody
+   i ogrodzenia; zmierzone 0,5 s. Geometria ulic kosztowała 12 s i 504,
+   a nazwę ulicy i tak bierzemy z reverse geocodingu. */
+function qlKrytyczne(lat,lon,r){
   const a="(around:"+r+","+lat+","+lon+")";
   return "[out:json][timeout:25];"+
-    "(way"+a+"[highway];way"+a+"[barrier];way"+a+"[railway];)->.l;"+
+    "(way"+a+"[highway=steps];way"+a+"[barrier];)->.l;"+
     "(node"+a+"[highway];node"+a+"[barrier];node"+a+"[kerb];node"+a+"[entrance];"+
-    "nwr"+a+'["addr:housenumber"];nwr'+a+"[amenity];nwr"+a+"[shop];nwr"+a+"[office];"+
     "node"+a+"[public_transport];node"+a+"[railway];)->.p;"+
-    ".l out geom 500;.p out center 1500;";
+    ".l out geom 300;.p out center 800;";
 }
-async function askOverpass(ql){
+/* Etap 2 — uzupełnienie: adresy, sklepy, usługi. Wolniejsze, ale jak padnie,
+   użytkownik ma już komplet informacji o przejściach i przeszkodach. */
+function qlReszta(lat,lon,r){
+  const a="(around:"+r+","+lat+","+lon+")";
+  return "[out:json][timeout:25];"+
+    "(nwr"+a+'["addr:housenumber"];nwr'+a+"[amenity];nwr"+a+"[shop];nwr"+a+"[office];)->.p;"+
+    ".p out center 1200;";
+}
+/* Overpass bywa przeciążony niezależnie od wagi zapytania: ta sama treść
+   raz wraca w 3 s, raz daje 504 po 13 s. Trzy podejścia z narastającą przerwą. */
+const PRZERWY=[0,2500,6000];
+async function askOverpass(ql,cicho){
   const fails=[];
-  for(let proba=1;proba<=2;proba++){
-    if(proba>1){ powiedz("Serwer zajęty, ponawiam."); await new Promise(s=>setTimeout(s,2500)); }
+  for(let proba=0;proba<PRZERWY.length;proba++){
+    if(PRZERWY[proba]){
+      if(!cicho&&proba===1) powiedz("Serwer zajęty, ponawiam.");
+      await new Promise(s=>setTimeout(s,PRZERWY[proba]));
+    }
     const ac=new AbortController();
     const tm=setTimeout(()=>ac.abort(),28000);
     try{
       const r=await fetch(HOST+"/api/interpreter",{method:"POST",signal:ac.signal,
         headers:{"Content-Type":"application/x-www-form-urlencoded"},
         body:"data="+encodeURIComponent(ql)});
-      if(!r.ok){ fails.push("próba "+proba+": HTTP "+r.status); continue; }
+      if(!r.ok){ fails.push("próba "+(proba+1)+": HTTP "+r.status); continue; }
       return await r.json();
     }catch(e){
-      fails.push("próba "+proba+": "+(e.name==="AbortError"?"brak odpowiedzi":e.message));
+      fails.push("próba "+(proba+1)+": "+(e.name==="AbortError"?"brak odpowiedzi":e.message));
     }finally{ clearTimeout(tm); }
   }
   const err=new Error("serwer nie odpowiedział"); err.fails=fails; throw err;
 }
-async function dajDane(){
-  if(cache&&dist(cache.lat,cache.lon,pt.lat,pt.lon)<ODSWIEZ_PO) return cache.elements;
-  if(cache&&Date.now()-ostatniPobor<30000) return cache.elements;
-  ostatniPobor=Date.now();
-  const d=await askOverpass(buildQL(pt.lat,pt.lon,CACHE_R));
-  cache={lat:pt.lat, lon:pt.lon, elements:d.elements||[]};
-  return cache.elements;
+
+let cacheK=null, cacheR=null, uzytoStarych=false;
+const swiezy=c=>c&&dist(c.lat,c.lon,pt.lat,pt.lon)<ODSWIEZ_PO&&Date.now()-c.czas<300000;
+
+async function pobierz(ktory,ql,cicho){
+  const stary=ktory==="k"?cacheK:cacheR;
+  if(swiezy(stary)) return stary.el;
+  try{
+    const d=await askOverpass(ql,cicho);
+    const wpis={lat:pt.lat, lon:pt.lon, czas:Date.now(), el:d.elements||[]};
+    if(ktory==="k") cacheK=wpis; else cacheR=wpis;
+    return wpis.el;
+  }catch(e){
+    /* Nieaktualne dane są lepsze niż cisza — ale użytkownik musi wiedzieć. */
+    if(stary&&dist(stary.lat,stary.lon,pt.lat,pt.lon)<300){ uzytoStarych=true; return stary.el; }
+    throw e;
+  }
 }
+const dajKrytyczne = cicho => pobierz("k", qlKrytyczne(pt.lat,pt.lon,CACHE_R), cicho);
+const dajReszte    = ()    => pobierz("r", qlReszta(pt.lat,pt.lon,CACHE_R), true);
+
+/* ============ DANE OKOLICY W TELEFONIE ============
+   Jednorazowe pobranie kwadratu 5 na 5 km wokół pozycji. Potem skanowanie
+   jest natychmiastowe, działa bez zasięgu i nie obciąża cudzego serwera. */
+const KLUCZ="otoczenie:okolica";
+const POLBOK=0.0225;   // stopnie szerokości ≈ 2,5 km
+let okolica=null;
+
+const TAGI=["highway","barrier","kerb","entrance","amenity","shop","office","railway",
+  "public_transport","crossing","crossing:signals","traffic_signals:sound","tactile_paving",
+  "step_count","handrail","wheelchair","automatic_door","name","addr:street",
+  "addr:housenumber","operator","brand","footway","building"];
+
+function wBbox(p,bb){ return p.lat>=bb[0]&&p.lat<=bb[1]&&p.lon>=bb[2]&&p.lon<=bb[3]; }
+function wczytajOkolice(){
+  try{ const s=localStorage.getItem(KLUCZ); if(s) okolica=JSON.parse(s); }catch(e){ okolica=null; }
+  opiszOkolice();
+}
+function opiszOkolice(){
+  if(!okolica){
+    $("daneTxt").textContent="Brak pobranych danych — każde skanowanie pyta serwer.";
+    $("usunDane").hidden=true; return;
+  }
+  const dni=Math.floor((Date.now()-okolica.czas)/86400000);
+  $("daneTxt").textContent=okolica.rek.length+" obiektów, pobrane "+
+    (dni===0?"dzisiaj":dni===1?"wczoraj":dni+" dni temu")+
+    ". Skanowanie działa bez internetu.";
+  $("pobierz").textContent="Odśwież dane okolicy";
+  $("usunDane").hidden=false;
+}
+function skompresuj(elementy){
+  const out=[];
+  for(const e of elementy){
+    const t=e.tags||{}; const o={};
+    for(const k of TAGI) if(t[k]!=null) o[k]=t[k];
+    if(!Object.keys(o).length) continue;
+    if(Array.isArray(e.geometry)){
+      out.push({t:o, g:e.geometry.filter(p=>p.lat!=null)
+        .map(p=>[+p.lat.toFixed(6),+p.lon.toFixed(6)])});
+    }else{
+      const la=e.lat??e.center?.lat, lo=e.lon??e.center?.lon;
+      if(la==null) continue;
+      out.push({t:o, p:[+la.toFixed(6),+lo.toFixed(6)]});
+    }
+  }
+  return out;
+}
+function qlObszar(s,w,n,e){
+  const b="("+s+","+w+","+n+","+e+")";
+  return "[out:json][timeout:120];"+
+    "(way"+b+"[highway=steps];)->.l;"+
+    "(node"+b+"[highway];node"+b+"[barrier];node"+b+"[kerb];node"+b+"[entrance];"+
+    "node"+b+"[public_transport];node"+b+"[railway];"+
+    "nwr"+b+'["addr:housenumber"];nwr'+b+"[amenity];nwr"+b+"[shop];nwr"+b+"[office];)->.p;"+
+    ".l out geom 2000;.p out center 15000;";
+}
+$("pobierz").onclick=async()=>{
+  if(!pt) return powiedz("Najpierw muszę ustalić pozycję.",{przerwij:true});
+  $("pobierz").disabled=true;
+  const polbokLon=POLBOK/Math.cos(pt.lat*Math.PI/180);
+  const bb=[pt.lat-POLBOK, pt.lat+POLBOK, pt.lon-polbokLon, pt.lon+polbokLon];
+  /* Cztery ćwiartki zamiast jednego wielkiego zapytania — mniejsze porcje
+     rzadziej kończą się przeciążeniem serwera. */
+  const srLat=(bb[0]+bb[1])/2, srLon=(bb[2]+bb[3])/2;
+  const cwiartki=[[bb[0],bb[2],srLat,srLon],[bb[0],srLon,srLat,bb[3]],
+                  [srLat,bb[2],bb[1],srLon],[srLat,srLon,bb[1],bb[3]]];
+  powiedz("Pobieram dane okolicy, kwadrat pięć na pięć kilometrów. To potrwa około minuty.",{przerwij:true});
+  const zebrane=[]; let bledy=0;
+  for(let i=0;i<cwiartki.length;i++){
+    $("daneTxt").textContent="Pobieram część "+(i+1)+" z 4…";
+    try{
+      const d=await askOverpass(qlObszar(...cwiartki[i]),true);
+      zebrane.push(...skompresuj(d.elements||[]));
+      powiedz("Część "+(i+1)+" z czterech gotowa.");
+    }catch(e){ bledy++; powiedz("Część "+(i+1)+" nie pobrała się."); }
+    if(i<3) await new Promise(s=>setTimeout(s,2000));
+  }
+  $("pobierz").disabled=false;
+  if(!zebrane.length){
+    $("daneTxt").textContent="Nie udało się pobrać żadnych danych.";
+    return powiedz("Nie udało się pobrać danych. Spróbuj za kilka minut.");
+  }
+  okolica={bbox:bb, czas:Date.now(), rek:zebrane};
+  try{
+    localStorage.setItem(KLUCZ, JSON.stringify(okolica));
+    opiszOkolice();
+    powiedz("Zapisano "+obiekty(zebrane.length)+
+      (bledy?". Uwaga: "+bledy+" z czterech części się nie pobrało, dane są niepełne.":"")+
+      ". Skanowanie działa teraz bez internetu.");
+  }catch(e){
+    $("daneTxt").textContent="Dane pobrane, ale nie zmieściły się w pamięci telefonu.";
+    powiedz("Dane pobrane, ale nie zmieściły się w pamięci przeglądarki. "+
+      "Działają do zamknięcia strony.");
+  }
+};
+$("usunDane").onclick=()=>{
+  okolica=null;
+  try{ localStorage.removeItem(KLUCZ); }catch(e){}
+  $("pobierz").textContent="Pobierz dane okolicy";
+  opiszOkolice();
+  powiedz("Dane usunięte.",{przerwij:true});
+};
+const maszLokalne = () => !!(okolica && pt && wBbox(pt,okolica.bbox));
+wczytajOkolice();
 
 function zbierz(els,skad,zasieg){
   const kosze={}; SEKCJE.forEach(s=>kosze[s.id]=new Map());
   for(const el of els){
-    const t=el.tags||{}; if(!Object.keys(t).length) continue;
+    const t=el.tags||el.t||{}; if(!Object.keys(t).length) continue;
     const hit=rozpoznaj(t); if(!hit) continue;
     const np=najblizszy(el,skad); if(!np||np.d>zasieg) continue;
-    const nazwa=etykieta(t);
-    const klucz=nazwa?hit.kat+"|"+nazwa
-                     :hit.kat+"|"+hit.opis+"|"+np.la.toFixed(5)+","+np.lo.toFixed(5);
+    const et=etykieta(t);
+    const klucz=et?hit.kat+"|"+et.ekran
+                  :hit.kat+"|"+hit.opis+"|"+np.la.toFixed(5)+","+np.lo.toFixed(5);
     const prev=kosze[hit.kat].get(klucz);
     if(!prev||np.d<prev.d)
-      kosze[hit.kat].set(klucz,{id:klucz, nazwa, opis:hit.opis, cichy:hit.cichy,
+      kosze[hit.kat].set(klucz,{id:klucz, nazwa:et&&et.ekran, nazwaMowa:et&&et.mowa,
+        opis:hit.opis, cichy:hit.cichy,
         d:np.d, la:np.la, lo:np.lo, az:azymut(skad.lat,skad.lon,np.la,np.lo)});
   }
   const grupy={};
@@ -487,33 +675,63 @@ function zbierz(els,skad,zasieg){
 }
 
 /* ============ SKAN ============ */
+const SEKCJE_PILNE=[PRZEJSCIA,PRZESZKODY,TRANSPORT];
+const SEKCJE_RESZTA=[WEJSCIA,USLUGI,ULICE];
+
 $("skanuj").onclick=async()=>{
   if(!pt) return powiedz("Najpierw muszę ustalić pozycję.",{przerwij:true});
-  $("skanuj").disabled=true;
+  $("skanuj").disabled=true; uzytoStarych=false;
   powiedz("Skanuję otoczenie.",{przerwij:true});
+
+  if(maszLokalne()){
+    const grupy=zbierz(okolica.rek,pt,ZASIEG);
+    ostatniSkan=grupy; rysuj(grupy);
+    powiedz(opisSkanu(grupy,SEKCJE.map(s=>s.id),true));
+    $("skanuj").disabled=false; return;
+  }
+
+  let kryt=null;
   try{
-    const grupy=zbierz(await dajDane(),pt,ZASIEG);
-    ostatniSkan=grupy; rysuj(grupy); powiedz(opisSkanu(grupy));
+    kryt=await dajKrytyczne(false);
+    const grupy=zbierz(kryt,pt,ZASIEG);
+    ostatniSkan=grupy; rysuj(grupy);
+    if(uzytoStarych) powiedz("Serwer nie odpowiada, podaję dane sprzed chwili.");
+    powiedz(opisSkanu(grupy,SEKCJE_PILNE,true));
   }catch(e){
     const m="Nie udało się pobrać danych. "+(e.fails?e.fails.join(". "):e.message);
     setStatus(m,"err"); powiedz(m);
+    $("skanuj").disabled=false; return;
+  }
+  try{
+    const reszta=await dajReszte();
+    const grupy=zbierz(kryt.concat(reszta),pt,ZASIEG);
+    ostatniSkan=grupy; rysuj(grupy);
+    powiedz(opisSkanu(grupy,SEKCJE_RESZTA,false));
+  }catch(e){
+    powiedz("Adresów i sklepów nie udało się pobrać. Przejścia i przeszkody są aktualne.");
   }finally{ $("skanuj").disabled=false; }
 };
 $("powtorz").onclick=()=>{
   if(!ostatniSkan) return powiedz("Nie ma czego powtórzyć. Najpierw zeskanuj otoczenie.",{przerwij:true});
-  powiedz(opisSkanu(ostatniSkan),{przerwij:true});
+  powiedz(opisSkanu(ostatniSkan,SEKCJE.map(s=>s.id),true),{przerwij:true});
 };
-function opisSkanu(grupy){
-  let ile=0; SEKCJE.forEach(s=>ile+=grupy[s.id].length);
-  if(!ile) return "W promieniu "+metry(ZASIEG)+" mapa nic nie zna. To nie znaczy, że wokół nic nie ma.";
-  const cz=["W promieniu "+metry(ZASIEG)+": "+obiekty(ile)+"."];
-  for(const s of SEKCJE){
+
+function opisSkanu(grupy,ktore,zNaglowkiem){
+  const wybrane=SEKCJE.filter(s=>ktore.includes(s.id));
+  let ile=0; wybrane.forEach(s=>ile+=grupy[s.id].length);
+  if(!ile) return zNaglowkiem
+    ? "W promieniu "+metry(ZASIEG)+" mapa nie zna przejść ani przeszkód. "+
+      "To nie znaczy, że ich nie ma."
+    : "Adresów ani sklepów w tym promieniu mapa nie zna.";
+  const cz=[];
+  if(zNaglowkiem) cz.push("W promieniu "+metry(ZASIEG)+": "+obiekty(ile)+".");
+  for(const s of wybrane){
     const l=grupy[s.id]; if(!l.length) continue;
     cz.push(s.label+": "+obiekty(l.length)+".");
     l.slice(0,4).forEach(it=>
-      cz.push((it.nazwa?it.nazwa+", "+it.opis:it.opis)+", "+metry(it.d)+", "+kierunekMowa(it.az)+"."));
+      cz.push((it.nazwaMowa?it.nazwaMowa+", "+it.opis:it.opis)+", "+metry(it.d)+", "+kierunekMowa(it.az)+"."));
   }
-  if(heading==null) cz.push("Kompas nieaktywny, kierunki podaję jako strony świata.");
+  if(zNaglowkiem&&heading==null) cz.push("Kompas nieaktywny, kierunki podaję jako strony świata.");
   return cz.join(" ");
 }
 
@@ -541,7 +759,9 @@ async function wKroku(p){
   }
   pokazGdzie("W ruchu", p.coords.accuracy);
   if(cel) zapowiedzCel();
-  let els; try{ els=await dajDane(); }catch(e){ return; }
+  let els;
+  if(maszLokalne()) els=okolica.rek;
+  else try{ els=await dajKrytyczne(true); }catch(e){ return; }
   const grupy=zbierz(els,pt,ZASIEG);
   ostatniSkan=grupy; rysuj(grupy);
   const teraz=Date.now();
@@ -552,16 +772,17 @@ async function wKroku(p){
     zapowiedziane.add(it.id);
     ostatniaZapowiedz=teraz;
     wibruj(it.d<25?[120,60,120]:80);
-    powiedz((it.nazwa?it.nazwa+", ":"")+it.opis+", "+metry(it.d)+", "+kierunekMowa(it.az)+".");
+    powiedz((it.nazwaMowa?it.nazwaMowa+", ":"")+it.opis+", "+metry(it.d)+", "+kierunekMowa(it.az)+".");
     return;
   }
 }
 
 /* ============ PROWADZENIE ============ */
 function ustawCel(it){
-  cel={la:it.la, lo:it.lo, nazwa:it.nazwa||it.opis};
+  cel={la:it.la, lo:it.lo, nazwa:it.nazwa||it.opis,
+       mowa:it.nazwaMowa||it.nazwa||it.opis};
   $("celStop").hidden=false;
-  powiedz("Cel ustawiony: "+cel.nazwa+".",{przerwij:true});
+  powiedz("Cel ustawiony: "+cel.mowa+".",{przerwij:true});
   zapowiedzCel();
 }
 $("celStop").onclick=()=>{
@@ -573,7 +794,7 @@ function zapowiedzCel(){
   const d=dist(pt.lat,pt.lon,cel.la,cel.lo), az=azymut(pt.lat,pt.lon,cel.la,cel.lo);
   $("celTxt").textContent="Cel: "+cel.nazwa+" — "+d+" m, "+kierunekEkran(az);
   if(d<=8){
-    powiedz("Jesteś przy celu: "+cel.nazwa+".",{przerwij:true});
+    powiedz("Jesteś przy celu: "+cel.mowa+".",{przerwij:true});
     wibruj([200,80,200]); cel=null; $("celStop").hidden=true; return;
   }
   const teraz=Date.now();
