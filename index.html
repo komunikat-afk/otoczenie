@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2b2d31">
+<title>Otoczenie</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&display=swap">
+<style>
+/* Układ: jedna kolumna pod kciuk — lokalizacja, promień, wynik posortowany wg wagi */
+:root{
+  --bg:#f5f4f0; --surface:#fff; --fg:#1b1a17; --muted:#6e6a62; --line:#e0ddd5;
+  --accent:#8a5a2b; --accent-soft:rgba(138,90,43,.1);
+  --alarm:#a93226; --alarm-soft:rgba(169,50,38,.1);
+  --good:#2f6f4e; --good-soft:rgba(47,111,78,.1);
+  --display:"Archivo",system-ui,sans-serif;
+  --body:system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#16171a; --surface:#1e2024; --fg:#e9e7e2; --muted:#98948c; --line:#31343a;
+    --accent:#d99b5e; --accent-soft:rgba(217,155,94,.13);
+    --alarm:#f08478; --alarm-soft:rgba(240,132,120,.13);
+    --good:#6fcf9a; --good-soft:rgba(111,207,154,.13);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16171a; --surface:#1e2024; --fg:#e9e7e2; --muted:#98948c; --line:#31343a;
+  --accent:#d99b5e; --accent-soft:rgba(217,155,94,.13);
+  --alarm:#f08478; --alarm-soft:rgba(240,132,120,.13);
+  --good:#6fcf9a; --good-soft:rgba(111,207,154,.13);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);
+  padding-block:20px 56px;padding-left:16px;padding-right:16px;
+  -webkit-text-size-adjust:100%}
+.wrap{max-width:620px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+h1{font-family:var(--display);font-size:25px;font-weight:700;margin:0;letter-spacing:-.02em}
+.tag{font-size:13px;color:var(--muted);margin:2px 0 6px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:15px}
+label{display:block;font-size:12px;font-weight:600;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+input{width:100%;font:inherit;padding:11px 12px;border:1px solid var(--line);
+  border-radius:9px;background:var(--bg);color:var(--fg)}
+input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button{font:inherit;font-weight:600;border-radius:9px;cursor:pointer;
+  border:1px solid var(--accent);background:var(--accent);color:#fff;padding:12px 16px}
+button.ghost{background:transparent;color:var(--accent)}
+button:disabled{opacity:.45;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row>*{flex:1 1 auto;min-width:0}
+.big{width:100%;padding:14px;font-size:17px;margin-top:4px}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{flex:0 0 auto;padding:9px 15px;border-radius:999px;border:1px solid var(--line);
+  background:transparent;color:var(--fg);font-size:14px;font-weight:600}
+.chip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.coords{font-family:var(--mono);font-size:13px;color:var(--muted);
+  margin-top:10px;font-variant-numeric:tabular-nums}
+.hits{display:none;flex-direction:column;gap:12px}
+.sect{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.sect.alarm{border-color:var(--alarm);border-width:1px}
+.shead{display:flex;align-items:center;gap:9px;padding:13px 15px;
+  font-family:var(--display);font-weight:600;font-size:16px;
+  background:transparent;border:0;width:100%;text-align:left;color:var(--fg)}
+.sect.alarm .shead{background:var(--alarm-soft)}
+.count{margin-left:auto;font-family:var(--mono);font-size:13px;color:var(--muted);
+  font-variant-numeric:tabular-nums;font-weight:400}
+.item{display:flex;gap:11px;align-items:baseline;padding:10px 15px;
+  border-top:1px solid var(--line);font-size:15px}
+.item .nm{flex:1 1 auto;min-width:0}
+.item .kind{display:block;font-size:12.5px;color:var(--muted);margin-top:1px}
+.dist{flex:0 0 auto;font-family:var(--mono);font-size:13.5px;
+  font-variant-numeric:tabular-nums;color:var(--muted)}
+.dist.near{color:var(--alarm);font-weight:600}
+a.map{flex:0 0 auto;color:var(--accent);text-decoration:none;font-size:13px;font-weight:600}
+.note{font-size:13.5px;color:var(--muted);padding:11px 15px;border-top:1px solid var(--line)}
+.status{font-size:14px;padding:12px 14px;border-radius:9px;background:var(--accent-soft);
+  color:var(--accent);font-weight:600;display:none}
+.status.err{background:var(--alarm-soft);color:var(--alarm)}
+.status.ok{background:var(--good-soft);color:var(--good)}
+.sugg{list-style:none;margin:9px 0 0;padding:0;display:flex;flex-direction:column;gap:5px}
+.sugg button{width:100%;text-align:left;background:transparent;color:var(--fg);
+  border:1px solid var(--line);font-weight:400;font-size:14px;padding:10px 12px}
+@media (prefers-reduced-motion:no-preference){.sect{transition:border-color .15s}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Otoczenie</h1>
+    <p class="tag">Co stoi w najbliższym sąsiedztwie punktu, do 100 m. Odległość liczona
+      do najbliższego punktu obiektu. Dane: OpenStreetMap.</p>
+  </header>
+
+  <div class="card">
+    <label for="addr">Adres lub miejscowość</label>
+    <input id="addr" type="search" placeholder="np. Grodzisk Mazowiecki, Ogrodowa 12"
+           autocomplete="off" enterkeyhint="search">
+    <ul class="sugg" id="sugg"></ul>
+    <div class="row" style="margin-top:10px">
+      <button class="ghost" id="find" type="button">Szukaj adresu</button>
+      <button class="ghost" id="gps" type="button">Moja pozycja</button>
+    </div>
+    <div class="coords" id="coords">Nie wybrano punktu.</div>
+  </div>
+
+  <div class="card">
+    <label>Promień</label>
+    <div class="chips" id="radii"></div>
+    <button class="big" id="go" type="button" disabled>Sprawdź otoczenie</button>
+  </div>
+
+  <div class="status" id="status"></div>
+  <div class="hits" id="hits"></div>
+
+</div>
+
+<script>
+"use strict";
+const HOST = "https://overpass-api.de";
+const $ = id => document.getElementById(id);
+let pt = null, radius = 50;
+
+/* --- promienie --- */
+[25,50,75,100].forEach(r=>{
+  const b=document.createElement("button");
+  b.type="button"; b.className="chip"; b.textContent = r+" m";
+  b.setAttribute("aria-pressed", String(r===radius));
+  b.onclick=()=>{ radius=r;
+    [...$("radii").children].forEach(c=>c.setAttribute("aria-pressed","false"));
+    b.setAttribute("aria-pressed","true"); };
+  $("radii").appendChild(b);
+});
+
+/* --- kategorie: kolejność = waga dla oceny działki --- */
+const CATS = [
+  {id:"uciazliwe", label:"Uciążliwości", alarm:true, near:50, tests:[
+    [t=>/^(motorway|trunk|primary)$/.test(t.highway||""), "droga o dużym ruchu"],
+    [t=>t.railway==="rail", "linia kolejowa"],
+    [t=>t.landuse==="industrial"||t.man_made==="works", "teren przemysłowy"],
+    [t=>t.man_made==="wastewater_plant", "oczyszczalnia ścieków"],
+    [t=>t.landuse==="landfill"||t.amenity==="waste_transfer_station", "składowisko odpadów"],
+    [t=>t.power==="substation"||t.power==="line", "infrastruktura energetyczna"],
+    [t=>t.man_made==="mast"||t.man_made==="tower", "maszt / wieża"],
+    [t=>!!t.aeroway, "lotnisko"],
+    [t=>t.landuse==="farmyard"||t.building==="farm_auxiliary", "zabudowa gospodarcza"]
+  ]},
+  {id:"transport", label:"Transport", tests:[
+    [t=>t.highway==="bus_stop", "przystanek autobusowy"],
+    [t=>t.railway==="station"||t.railway==="halt", "stacja kolejowa"],
+    [t=>t.amenity==="fuel", "stacja paliw"]
+  ]},
+  {id:"edukacja", label:"Szkoły i przedszkola", tests:[
+    [t=>t.amenity==="school", "szkoła"],
+    [t=>t.amenity==="kindergarten", "przedszkole"]
+  ]},
+  {id:"zdrowie", label:"Zdrowie", tests:[
+    [t=>t.amenity==="pharmacy", "apteka"],
+    [t=>t.amenity==="doctors"||t.amenity==="clinic", "przychodnia"],
+    [t=>t.amenity==="hospital", "szpital"]
+  ]},
+  {id:"sklepy", label:"Sklepy i usługi", tests:[
+    [t=>t.shop==="supermarket", "supermarket"],
+    [t=>!!t.shop, "sklep"],
+    [t=>t.amenity==="bank"||t.amenity==="atm", "bank / bankomat"],
+    [t=>t.amenity==="post_office", "poczta"],
+    [t=>t.amenity==="restaurant"||t.amenity==="cafe", "gastronomia"]
+  ]},
+  {id:"rekreacja", label:"Zieleń i rekreacja", tests:[
+    [t=>t.leisure==="park"||t.leisure==="garden", "park"],
+    [t=>t.leisure==="playground", "plac zabaw"],
+    [t=>t.leisure==="pitch"||t.leisure==="sports_centre", "obiekt sportowy"],
+    [t=>t.natural==="water"||t.waterway==="river", "woda"]
+  ]}
+];
+
+function classify(tags){
+  for (const c of CATS)
+    for (const [test, kind] of c.tests)
+      if (test(tags)) return {cat:c, kind};
+  return null;
+}
+
+function dist(a,b,c,d){
+  const R=6371000, p=Math.PI/180;
+  const dla=(c-a)*p, dlo=(d-b)*p;
+  const h=Math.sin(dla/2)**2 + Math.cos(a*p)*Math.cos(c*p)*Math.sin(dlo/2)**2;
+  return Math.round(2*R*Math.asin(Math.sqrt(h)));
+}
+const fmt = m => m+" m";
+
+/* Najbliższy punkt obiektu, nie jego środek. Dla drogi liczy się miejsce,
+   w którym mija działkę — środek jej geometrii bywa kilometry dalej. */
+function nearestPoint(el){
+  const pts=[];
+  if(Array.isArray(el.geometry)) pts.push(...el.geometry);
+  if(Array.isArray(el.members))
+    el.members.forEach(m=>{ if(Array.isArray(m.geometry)) pts.push(...m.geometry); });
+  if(!pts.length){
+    const la=el.lat ?? el.center?.lat, lo=el.lon ?? el.center?.lon;
+    return (la==null||lo==null) ? null : {la, lo, d:dist(pt.lat,pt.lon,la,lo)};
+  }
+  let best=null;
+  for(const g of pts){
+    if(g.lat==null) continue;
+    const d=dist(pt.lat,pt.lon,g.lat,g.lon);
+    if(!best||d<best.d) best={la:g.lat, lo:g.lon, d};
+  }
+  return best;
+}
+
+function setStatus(msg, kind){
+  const s=$("status");
+  if(!msg){ s.style.display="none"; return; }
+  s.textContent=msg; s.className="status"+(kind?" "+kind:""); s.style.display="block";
+}
+
+function setPoint(lat, lon, label){
+  pt={lat:+lat, lon:+lon};
+  $("coords").textContent = (label ? label+" · " : "") +
+    pt.lat.toFixed(5)+", "+pt.lon.toFixed(5);
+  $("go").disabled=false;
+  try{ localStorage.setItem("otoczenie:pt", JSON.stringify({...pt,label})); }catch(e){}
+}
+
+try{
+  const s=JSON.parse(localStorage.getItem("otoczenie:pt")||"null");
+  if(s && isFinite(s.lat)) setPoint(s.lat, s.lon, s.label);
+}catch(e){}
+
+/* --- GPS --- */
+$("gps").onclick=()=>{
+  if(!navigator.geolocation) return setStatus("Przeglądarka nie udostępnia lokalizacji.","err");
+  setStatus("Ustalam pozycję…");
+  navigator.geolocation.getCurrentPosition(
+    p=>{ setPoint(p.coords.latitude, p.coords.longitude, "moja pozycja"); setStatus(""); },
+    e=>setStatus("Nie udało się pobrać pozycji: "+e.message,"err"),
+    {enableHighAccuracy:true, timeout:15000, maximumAge:60000}
+  );
+};
+
+/* --- wyszukiwanie adresu (Nominatim) --- */
+async function findAddr(){
+  const q=$("addr").value.trim();
+  if(q.length<3) return setStatus("Wpisz co najmniej 3 znaki.","err");
+  setStatus("Szukam adresu…"); $("sugg").innerHTML="";
+  try{
+    const u="https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5"+
+            "&countrycodes=pl&q="+encodeURIComponent(q);
+    const r=await fetch(u,{headers:{"Accept":"application/json"}});
+    const d=await r.json();
+    if(!d.length) return setStatus("Nie znaleziono takiego adresu.","err");
+    setStatus("");
+    d.forEach(x=>{
+      const li=document.createElement("li");
+      const b=document.createElement("button");
+      b.type="button"; b.textContent=x.display_name;
+      b.onclick=()=>{ setPoint(x.lat, x.lon, x.name||q); $("sugg").innerHTML=""; };
+      li.appendChild(b); $("sugg").appendChild(li);
+    });
+  }catch(e){ setStatus("Wyszukiwarka adresów nie odpowiada: "+e.message,"err"); }
+}
+$("find").onclick=findAddr;
+$("addr").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); findAddr(); }});
+
+/* --- zapytanie Overpass --- */
+function buildQL(lat,lon,r){
+  const a="(around:"+r+","+lat+","+lon+")";
+  const sel=['[amenity]','[shop]','[leisure]','[highway=bus_stop]','[railway~"^(rail|station|halt)$"]',
+    '[highway~"^(motorway|trunk|primary)$"]','[landuse~"^(industrial|landfill|farmyard)$"]',
+    '[man_made~"^(works|wastewater_plant|mast|tower)$"]','[power~"^(line|substation)$"]',
+    '[aeroway]','[natural=water]','[waterway=river]'];
+  return "[out:json][timeout:12];(\n"+
+    sel.map(s=>"  nwr"+a+s+";").join("\n")+
+    "\n);\nout tags geom 500;";
+}
+
+/* Próbuje POST, potem GET, potem kolejny serwer. Blokady bywają wybiórcze —
+   część filtrów przepuszcza GET, a zatrzymuje POST. */
+/* Jedno żądanie na serwer, POST, krótki limit czasu. Overpass dopuszcza
+   kilka zapytań naraz na adres IP — zalewanie go próbami tylko nabija limit. */
+/* Overpass bywa chwilowo przeciążony i odpowiada 504 mniej więcej co trzecie
+   zapytanie. Dwa podejścia z przerwą wystarczają; więcej tylko nabija limit. */
+async function askOverpass(ql){
+  const fails=[];
+  for(let proba=1; proba<=2; proba++){
+    if(proba>1){
+      setStatus("Serwer był zajęty, ponawiam…");
+      await new Promise(s=>setTimeout(s, 2500));
+    }
+    const ac=new AbortController();
+    const tm=setTimeout(()=>ac.abort(), 20000);
+    try{
+      const r=await fetch(HOST+"/api/interpreter",{method:"POST",signal:ac.signal,
+        headers:{"Content-Type":"application/x-www-form-urlencoded"},
+        body:"data="+encodeURIComponent(ql)});
+      if(!r.ok){
+        fails.push("próba "+proba+": HTTP "+r.status+
+          (r.status===504?" (serwer przeciążony)":r.status===429?" (limit zapytań)":""));
+        continue;
+      }
+      return {data: await r.json(), via: proba>1 ? "za drugim razem" : null};
+    }catch(e){
+      fails.push("próba "+proba+": "+(e.name==="AbortError"?"brak odpowiedzi w 20 s":e.message));
+    }finally{ clearTimeout(tm); }
+  }
+  const err=new Error("serwer nie odpowiedział"); err.fails=fails; throw err;
+}
+
+/* Rozstrzyga, czy zawiodła sieć, czy nagłówki serwera. */
+async function diagnose(){
+  let dociera=false;
+  try{ await fetch("https://overpass-api.de/api/status",{mode:"no-cors",cache:"no-store"}); dociera=true; }catch(e){}
+  let inny=false;
+  try{ const n=await fetch("https://nominatim.openstreetmap.org/status.php?format=json"); inny=n.ok; }catch(e){}
+
+  if(dociera && inny)
+    return "Overpass odrzuca żądania z tej domeny ("+location.host+"), choć serwer odpowiada, "+
+           "a inne usługi OpenStreetMap z tej samej strony działają. Przenieś stronę pod inny adres "+
+           "— domena netlify.app jest odrzucana, github.io działa.";
+  if(dociera)
+    return "Serwer odpowiada, ale odpowiedź przychodzi bez nagłówków CORS. Zwykle to przeciążenie "+
+           "albo przekroczony limit zapytań. Odczekaj kilka minut.";
+  return "Żądania nie docierają do serwera. Blokuje je sieć, prywatny DNS albo blokada treści "+
+         "w przeglądarce. Sprawdź na innym łączu lub w innej przeglądarce.";
+}
+
+$("go").onclick=async()=>{
+  if(!pt) return;
+  $("go").disabled=true; $("hits").style.display="none";
+  setStatus("Pytam OpenStreetMap…");
+  try{
+    const {data, via} = await askOverpass(buildQL(pt.lat,pt.lon,radius));
+    render(data.elements||[], via);
+  }catch(e){
+    setStatus("Łączę się z diagnostyką…");
+    const verdict = await diagnose();
+    setStatus(verdict + "\n\nSzczegóły prób:\n" + (e.fails||[e.message]).join("\n"), "err");
+    $("status").style.whiteSpace="pre-line";
+  }finally{ $("go").disabled=false; }
+};
+
+function render(els, via){
+  const buckets=new Map(); CATS.forEach(c=>buckets.set(c.id,new Map()));
+  for(const el of els){
+    const t=el.tags||{}; if(!Object.keys(t).length) continue;
+    const hit=classify(t); if(!hit) continue;
+    const np=nearestPoint(el); if(!np) continue;
+    if(np.d>radius+15) continue;
+    const name=t.name||t["addr:street"]||null;
+    const key=hit.cat.id+"|"+(name||hit.kind);
+    const prev=buckets.get(hit.cat.id).get(key);
+    if(!prev||np.d<prev.d)
+      buckets.get(hit.cat.id).set(key,{name, kind:hit.kind, d:np.d, la:np.la, lo:np.lo});
+  }
+
+  const box=$("hits"); box.innerHTML="";
+  let total=0;
+  for(const c of CATS){
+    const list=[...buckets.get(c.id).values()].sort((a,b)=>a.d-b.d);
+    if(!list.length) continue;
+    total+=list.length;
+    const sec=document.createElement("section");
+    sec.className="sect"+(c.alarm?" alarm":"");
+    const h=document.createElement("div");
+    h.className="shead";
+    h.innerHTML='<span>'+c.label+'</span><span class="count">'+list.length+
+      " · najbliżej "+fmt(list[0].d)+"</span>";
+    sec.appendChild(h);
+    list.slice(0,14).forEach(it=>{
+      const row=document.createElement("div"); row.className="item";
+      const nm=document.createElement("div"); nm.className="nm";
+      nm.innerHTML="<span>"+esc(it.name||it.kind)+"</span>"+
+        (it.name?'<span class="kind">'+esc(it.kind)+"</span>":"");
+      const dd=document.createElement("span");
+      dd.className="dist"+(c.alarm&&it.d<=(c.near||0)?" near":"");
+      dd.textContent=fmt(it.d);
+      const a=document.createElement("a"); a.className="map"; a.target="_blank";
+      a.rel="noopener"; a.textContent="mapa";
+      a.href="https://www.openstreetmap.org/?mlat="+it.la+"&mlon="+it.lo+"#map=18/"+it.la+"/"+it.lo;
+      row.append(nm,dd,a); sec.appendChild(row);
+    });
+    if(list.length>14){
+      const n=document.createElement("div"); n.className="note";
+      n.textContent="…i jeszcze "+(list.length-14)+" dalej.";
+      sec.appendChild(n);
+    }
+    box.appendChild(sec);
+  }
+
+  if(!total){
+    setStatus("W promieniu "+fmt(radius)+" nic nie oznaczono w OpenStreetMap. "+
+      "Przy tak małym zasięgu to częste i nie znaczy, że wokół jest pusto.","err");
+    return;
+  }
+  const alarms=buckets.get("uciazliwe").size;
+  const src = via ? "  ·  "+via : "";
+  setStatus(alarms
+    ? "Znaleziono "+total+" obiektów, w tym "+alarms+" w kategorii uciążliwości."+src
+    : "Znaleziono "+total+" obiektów. Żadnych uciążliwości w tym promieniu."+src,
+    alarms?null:"ok");
+  box.style.display="flex";
+}
+
+function esc(s){ return String(s).replace(/[<>&"]/g,
+  c=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c])); }
+</script>
+</body>
+</html>
